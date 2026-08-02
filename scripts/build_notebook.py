@@ -237,9 +237,16 @@ sc.print_merge_counts(sites, atoms, df)               # cells -> sites -> atoms,
 """)
 
 code(r"""
-# The full district + the coverage graph on the densest sub-district we will run.
-# The graph is built from the ACTUAL atom register (snapped to Aquila's rows), so what
-# we draw here is exactly what the QPU solves.
+# The REAL Sukhumvit map: the region, the True cell towers on it, then the atoms and the
+# coverage graph — the same shape we hand to Aquila. Positions are real OpenCelliD estimates.
+map_edges = list(sc.build_graph(atoms).edges())     # geographic 500 m coverage graph
+viz.sukhumvit_map_layers("data/sukhumvit_basemap.png", "data/sukhumvit_basemap.json",
+                         atoms.lon, atoms.lat, map_edges)
+""")
+
+code(r"""
+# The same, abstractly: the full district and the coverage graph on the densest sub-district
+# we run — built from the ACTUAL atom register (snapped to Aquila's rows), i.e. what the QPU solves.
 subH = sc.select_densest(atoms, HEADLINE_ATOMS)
 regH = sc.affine_to_atoms(subH)
 edgesH = list(sc.build_graph_from_register(regH).edges())

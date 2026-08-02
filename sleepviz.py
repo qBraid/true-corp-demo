@@ -186,8 +186,77 @@ def scoreboard(sizes, optimum, best, scale_pts, aquila_today_s, future_s, retain
     """Two-panel RESULT-2 figure: shot histogram + honest wall-clock comparison."""
     fig, ax = plt.subplots(1, 2, figsize=(14, 5))
     tag = f" ({retained} retained)" if retained is not None else ""
-    shot_histogram(ax[0], sizes, optimum, best, title=f"Aquila 150-atom shot distribution{tag}")
+    shot_histogram(ax[0], sizes, optimum, best, title=f"Aquila shot distribution{tag}")
     wallclock(ax[1], scale_pts, aquila_today_s, future_s,
               title="Classical wins today — Aquila's flat line sits ABOVE it")
     fig.tight_layout()
     plt.show()          # display once; low-level helpers stay composable
+
+
+# ---------------------------------------------------------------------------
+# Real Sukhumvit basemap — geography -> towers -> atoms (dark)
+# ---------------------------------------------------------------------------
+# Sukhumvit Line BTS stations, for orientation.
+_BTS = [("Asok", 13.7370, 100.5604), ("Phrom Phong", 13.7304, 100.5697),
+        ("Thong Lo", 13.7242, 100.5786), ("Ekkamai", 13.7196, 100.5852)]
+
+
+def _lonlat_to_px(lon, lat, ext, W, H):
+    """Map WGS84 lon/lat to pixel coords of a Web-Mercator basemap (x linear in
+    lon, y in the Mercator projection) cropped to `ext` = (west, east, south, north)."""
+    west, east, south, north = ext
+    merc = lambda a: math.log(math.tan(math.pi / 4 + math.radians(a) / 2))
+    mn, ms = merc(north), merc(south)
+    px = (np.asarray(lon, float) - west) / (east - west) * W
+    py = (mn - np.array([merc(v) for v in np.atleast_1d(lat)])) / (mn - ms) * H
+    return px, py
+
+
+def sukhumvit_map_layers(basemap_path, basemap_json, lon, lat, edges=None, show_bts=True):
+    """Three-stage dark map: (1) Sukhumvit, (2) + real cell towers, (3) + the atoms
+    and the coverage graph. Overlays the REAL cell positions on a real basemap.
+
+    basemap_path : PNG from scripts/fetch_basemap.py
+    basemap_json : its {west,east,south,north,attribution} sidecar
+    lon, lat     : cell-site (atom) coordinates, degrees
+    edges        : coverage-graph edges (index pairs) for panel 3
+    """
+    import json as _json
+    import matplotlib.image as mpimg
+    img = mpimg.imread(basemap_path)
+    meta = _json.load(open(basemap_json))
+    ext = (meta["west"], meta["east"], meta["south"], meta["north"])
+    H, W = img.shape[0], img.shape[1]
+    px, py = _lonlat_to_px(lon, lat, ext, W, H)
+
+    fig, axes = plt.subplots(1, 3, figsize=(17, 5.8))
+    fig.patch.set_facecolor("#0b0b0b")
+    titles = ["Sukhumvit / Watthana", "True cell sites (OpenCelliD)",
+              "On Aquila — atoms + coverage graph"]
+    for i, ax in enumerate(axes):
+        ax.imshow(img, interpolation="lanczos")
+        ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
+        ax.set_title(titles[i], color="white", loc="left", fontsize=12.5, pad=8)
+        if show_bts:
+            for name, blat, blon in _BTS:
+                bx, by = _lonlat_to_px(blon, blat, ext, W, H)
+                bx, by = float(np.ravel(bx)[0]), float(np.ravel(by)[0])
+                ax.scatter(bx, by, s=26, facecolors="none", edgecolors="#6fd0e0",
+                           linewidths=1.1, zorder=4)
+                ax.text(bx + 6, by - 6, name, color="#9fe3ef",
+                        fontsize=7.5, zorder=4, alpha=0.9)
+        if i == 1:                                          # towers
+            ax.scatter(px, py, s=26, c=STYLE.true_red, edgecolors="white",
+                       linewidths=0.4, zorder=5, alpha=0.95)
+        if i == 2:                                          # atoms + coverage graph
+            if edges:
+                for a, b in edges:
+                    ax.plot([px[a], px[b]], [py[a], py[b]], color=STYLE.true_red,
+                            lw=0.5, alpha=0.35, zorder=3)
+            ax.scatter(px, py, s=150, c=STYLE.true_red, alpha=0.16, zorder=4)   # glow halo
+            ax.scatter(px, py, s=22, c="#ff5a76", edgecolors="white",
+                       linewidths=0.4, zorder=5)                                 # bright core
+    axes[0].text(0.01, 0.015, meta.get("attribution", "© OpenStreetMap © CARTO"),
+                 transform=axes[0].transAxes, color="#7a7a7a", fontsize=6.5, va="bottom")
+    fig.tight_layout()
+    plt.show()
