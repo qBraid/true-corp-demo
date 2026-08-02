@@ -41,9 +41,10 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 import sleepcells as sc  # noqa: E402
 
-DATA_CSV = os.path.join(HERE, "data", "watthana_cells.csv")
+DATA_CSV = os.path.join(HERE, "data", "watthana_cells_real.csv")   # REAL OpenCelliD extract
 RESULTS = os.path.join(HERE, "results")
 CENTER = (13.731, 100.575)
+HEADLINE_ATOMS = 90     # largest densest sub-district that fits Aquila's 75 um field on real data
 
 
 # --------------------------------------------------------------------------
@@ -56,7 +57,7 @@ def build_atoms():
     atoms = sc.merge_close_sites(sites)
     provenance = {
         "data_csv": os.path.basename(DATA_CSV),
-        "data_kind": "REPRESENTATIVE (synthetic positions on real Watthana geography)",
+        "data_kind": "REAL OpenCelliD crowdsourced estimated positions (MCC 520, True-group MNCs; CC-BY-SA 4.0)",
         "n_cells": int(sites.n_cells),
         "n_sites": int(sites.n),
         "n_atoms_total": int(atoms.n),
@@ -161,7 +162,7 @@ def main():
     print(f"  cells {provenance['n_cells']} -> sites {provenance['n_sites']} "
           f"-> atoms {provenance['n_atoms_total']}")
 
-    sub150, reg150, G150, cl150 = make_instance(atoms, 150, "sukhumvit_150", provenance)
+    subH, regH, GH, clH = make_instance(atoms, HEADLINE_ATOMS, f"sukhumvit_{HEADLINE_ATOMS}", provenance)
     sub20, reg20, G20, cl20 = make_instance(atoms, 20, "sukhumvit_20", provenance)
     sub16, reg16, G16, cl16 = make_instance(atoms, 16, "sukhumvit_16", provenance)
 
@@ -182,24 +183,24 @@ def main():
                  for m in meas]
         print(f"  {name}: {dt:.1f}s  best={max(sizes)} mean={np.mean(sizes):.2f}")
 
-    # ---- PHENOMENOLOGICAL 150-atom stand-in (3 tasks x 1000 shots) ----
-    print("Generating phenomenological 150-atom stand-in (LABELLED, not a quantum sim) ...")
+    # ---- PHENOMENOLOGICAL headline stand-in (3 tasks x 1000 shots) ----
+    print(f"Generating phenomenological {HEADLINE_ATOMS}-atom stand-in (LABELLED, not a quantum sim) ...")
     tasks = []
     for t in range(3):
-        meas = phenomenological_shots(G150, reg150.n, shots=1000, seed=100 + t)
-        tasks.append({"task_id": f"standin-150-{t}", "shots": 1000, "measurements": meas})
+        meas = phenomenological_shots(GH, regH.n, shots=1000, seed=100 + t)
+        tasks.append({"task_id": f"standin-{HEADLINE_ATOMS}-{t}", "shots": 1000, "measurements": meas})
     sc.save_results(
-        os.path.join(RESULTS, "prerun_150_results.json"),
-        instance_name="sukhumvit_150", n_atoms=reg150.n, source="SIMULATED_STANDIN",
+        os.path.join(RESULTS, f"prerun_{HEADLINE_ATOMS}_results.json"),
+        instance_name=f"sukhumvit_{HEADLINE_ATOMS}", n_atoms=regH.n, source="SIMULATED_STANDIN",
         tasks=tasks,
         note=("PLACEHOLDER. Phenomenological stand-in (random-order greedy independent "
               "sets + loading defects), NOT a quantum simulation and NOT QPU data. "
               "Overwrite with the real Aquila pre-run before the event."),
     )
-    allsizes = [sum(1 for k in range(reg150.n) if m["pre"][k] == 1 and m["post"][k] == 0)
+    allsizes = [sum(1 for k in range(regH.n) if m["pre"][k] == 1 and m["post"][k] == 0)
                 for tk in tasks for m in tk["measurements"]]
-    exact = cl150["exact_size"]
-    print(f"  prerun_150_results: 3000 shots  best={max(allsizes)} mean={np.mean(allsizes):.1f} "
+    exact = clH["exact_size"]
+    print(f"  prerun_{HEADLINE_ATOMS}_results: 3000 shots  best={max(allsizes)} mean={np.mean(allsizes):.1f} "
           f"exact={exact}  approx_ratio(best/exact)={max(allsizes)/exact:.2f}")
 
 
