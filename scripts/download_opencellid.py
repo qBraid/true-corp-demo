@@ -79,6 +79,9 @@ def download_mcc_csv(token: str) -> pd.DataFrame:
     req = urllib.request.Request(url, headers={"User-Agent": "true-corp-demo/1.0 (quantum demo)"})
     with urllib.request.urlopen(req, timeout=300) as resp:
         raw = resp.read()
+    if raw[:1] == b"{":            # JSON body instead of gzip => an error (e.g. RATE_LIMITED)
+        import json
+        raise RuntimeError(f"OpenCelliD bulk download unavailable: {json.loads(raw.decode('utf-8','replace'))}")
     with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
         df = pd.read_csv(gz, names=COLUMNS, header=None)
     # Some exports include a header row; drop it if present.
