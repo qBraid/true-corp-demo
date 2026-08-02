@@ -936,9 +936,8 @@ def print_assumptions() -> None:
     print("  • MIS is a CONSERVATIVE relaxation of the true optimum (complement of a minimum")
     print("    dominating set). It guarantees feasibility but may leave savings unclaimed.")
     print("  • Coverage is modelled as UNIFORM-RADIUS disks. Real radii vary by band, tilt, class.")
-    print("  • Positions are OpenCelliD-style CROWDSOURCED estimated centroids, not surveyed towers.")
-    print("  • Positions are REPRESENTATIVE estimates on the real Watthana grid (see")
-    print("    data/DATA_PROVENANCE.md); a real OpenCelliD extract can be substituted.")
+    print("  • Positions are a REAL OpenCelliD extract (MCC 520, True-group MNCs) — crowdsourced")
+    print("    estimated centroids, NOT surveyed tower locations (data © OpenCelliD, CC-BY-SA 4.0).")
     print("  • NO quantum advantage is claimed anywhere. On these sizes, classical wins.")
     print("=" * 74)
 

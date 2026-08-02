@@ -219,3 +219,14 @@ __marimo__/
 
 # qBraid SDK source clone — kept locally for development, not part of this repo
 qBraid/
+
+# --- Secrets: OpenCelliD API token / local env files — NEVER commit ---
+.env
+.env.*
+.env/
+*.env
+opencellid.token
+*.token
+
+# Source slide deck PDF (kept locally, not a repo deliverable)
+dark-mode-slides.pdf

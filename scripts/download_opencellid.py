@@ -36,10 +36,30 @@ from __future__ import annotations
 import argparse
 import gzip
 import io
+import os
 import sys
 import urllib.request
 
 import pandas as pd
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def resolve_token(cli_token: str | None) -> str:
+    """Find the OpenCelliD token from --token, the OPEN_CELLID_TOKEN env var, or a
+    local .env file (never echoed). The .env file is gitignored."""
+    if cli_token:
+        return cli_token
+    if os.environ.get("OPEN_CELLID_TOKEN"):
+        return os.environ["OPEN_CELLID_TOKEN"]
+    env_path = os.path.join(HERE, ".env")
+    if os.path.exists(env_path):
+        for line in open(env_path):
+            line = line.strip()
+            if line.startswith("OPEN_CELLID_TOKEN") and "=" in line:
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise SystemExit("No OpenCelliD token found. Set OPEN_CELLID_TOKEN (env or .env) "
+                     "or pass --token.")
 
 # True-group MNCs under Thailand MCC 520 (competitors AIS/NT excluded).
 TRUE_GROUP_MNCS = (0, 4, 5, 18, 25, 99)
@@ -55,7 +75,9 @@ COLUMNS = ["radio", "mcc", "net", "area", "cell", "unit", "lon", "lat",
 def download_mcc_csv(token: str) -> pd.DataFrame:
     url = MCC_URL.format(token=token)
     print(f"Downloading MCC 520 export from OpenCelliD ...", file=sys.stderr)
-    with urllib.request.urlopen(url, timeout=300) as resp:
+    # OpenCelliD rejects the default python-urllib User-Agent with HTTP 403.
+    req = urllib.request.Request(url, headers={"User-Agent": "true-corp-demo/1.0 (quantum demo)"})
+    with urllib.request.urlopen(req, timeout=300) as resp:
         raw = resp.read()
     with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
         df = pd.read_csv(gz, names=COLUMNS, header=None)
@@ -81,12 +103,13 @@ def filter_true_watthana(df: pd.DataFrame) -> pd.DataFrame:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--token", required=True, help="OpenCelliD API token")
+    ap.add_argument("--token", default=None,
+                    help="OpenCelliD API token (default: OPEN_CELLID_TOKEN env / .env)")
     ap.add_argument("--out", default="data/watthana_cells_real.csv",
                     help="output CSV path")
     args = ap.parse_args()
 
-    df = download_mcc_csv(args.token)
+    df = download_mcc_csv(resolve_token(args.token))
     print(f"MCC 520 rows: {len(df):,}", file=sys.stderr)
     out = filter_true_watthana(df)
     out.to_csv(args.out, index=False)
