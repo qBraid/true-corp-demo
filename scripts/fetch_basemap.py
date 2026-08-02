@@ -28,7 +28,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import sys
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "src"))
 import sleepcells as sc  # noqa: E402
 
 CENTER = (13.731, 100.575)

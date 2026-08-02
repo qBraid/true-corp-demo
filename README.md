@@ -1,131 +1,94 @@
-# Which cells can sleep tonight?
+# Which towers can share a channel?
 
-A single self-contained Jupyter notebook for the live demonstration at **Quantum Club
-Thailand**, Grand Hall, True Digital Park (West), Bangkok — **3 August 2026**.
+A live demonstration for **Quantum Club Thailand**, Grand Hall, True Digital Park (West),
+Bangkok — **3 August 2026**, delivered by **qBraid × QTRiC**.
 
-It solves a real problem from True Corporation's Bangkok network — *which cell sites can be
-put to sleep at 3 a.m. without opening a coverage hole* — by mapping it to **Maximum
-Independent Set** on a unit-disk graph and running it on **QuEra's Aquila** neutral-atom
-processor via the **qBraid SDK**.
+It teaches **Maximum Independent Set** through a real telecom problem: *how many cell towers in
+Sukhumvit can transmit on one slice of spectrum without interfering* — mapped onto **QuEra's
+Aquila** neutral-atom processor via the **qBraid SDK**, and extended to a full **frequency-reuse
+plan** by repeated MIS (graph colouring).
 
-> **We do not claim quantum advantage.** On these instance sizes a classical solver wins on
-> wall-clock time; the notebook shows it and says so. The reason to run on quantum hardware
-> in 2026 is to *measure the gap*.
-
----
-
-## Run it
-
-On **qBraid Lab** (recommended — credentials are pre-configured):
-
-1. Upload this whole folder (the notebook needs `sleepcells.py`, `sleepviz.py`, `data/`,
-   `results/`; the slides are embedded, so `slides/` is only needed to rebuild the notebook).
-2. Open `which_cells_can_sleep.ipynb` and **Run All**. It executes top-to-bottom in well
-   under a minute; no QPU job is submitted by default.
-3. To submit the real live job on stage, set `SUBMIT_LIVE_JOB = True` in the Setup cell.
-
-Locally: `pip install -r requirements.txt`, then run the notebook. Device enumeration and
-the live job need qBraid credentials; every other cell runs fully offline from committed
-files.
-
-### The two knobs (top of the notebook)
-| Parameter | Default | Meaning |
-|---|---|---|
-| `COVERAGE_OVERLAP_M` | `500` | Two sites "mutually cover" within this many metres. If a district does not fit the chip's field of view, this is the knob. |
-| `LIVE_ATOMS` | `16` | Size of the audience live-simulation instance. **16** is the safe default (~2 s on Lab). The deck narrates *"the 20-atom instance"* — set `LIVE_ATOMS = 20` to match exactly (~30 s locally). `12` is bullet-proof. |
-| `SUBMIT_LIVE_JOB` | `False` | Leave `False` to rehearse (no credits spent). Set `True` on stage to submit the real Aquila job. |
+> **No quantum advantage is claimed.** A classical solver wins on wall-clock at these sizes; the
+> notebooks show it and say so. The point is that the constraint is *physical* — the Rydberg
+> blockade circles are the interference circles — measured against exact classical optima.
 
 ---
 
-## What is real, what is a stand-in
+## The two notebooks
 
-This build was prepared with **read-only** access to the qBraid platform — **no QPU jobs were
-submitted**. Two things are therefore stand-ins, and both are labelled loudly in the notebook:
+| Notebook | What it is |
+|---|---|
+| **`which_towers_can_share_a_channel.ipynb`** | The **qBraid × QTRiC deck**, running live in the notebook — every slide is the deck's own HTML + animations (`graph-stage` Canvas 2D; `concept-figure` / `mapping-stage` three.js), embedded as sandboxed iframes — interleaved with runnable "run it yourself" cells (mock MIS → 2 channels, the measured channel plan, the printed assumptions). |
+| **`qpu_result_widgets.ipynb`** | Interactive dark, qBraid-themed widgets over the **real Aquila result**: district → towers → atoms + coverage graph, and a channel-stepper across the measured colouring. |
 
-- **Cell positions** — `data/watthana_cells.csv` is **representative** data generated on the
-  real Watthana geography (real bounding box, real Sukhumvit BTS corridor, real True/dtac MNC
-  codes under MCC 520), **not** real OpenCelliD records and **not** surveyed towers. See
-  `data/DATA_PROVENANCE.md`. To use real data, run `scripts/download_opencellid.py` (needs a
-  free OpenCelliD token) and point `DATA_CSV` at the output — nothing else changes.
-
-- **QPU results** — the notebook is fully submit-ready, but the committed results are:
-  - `results/localsim_{16,20}_results.json` — **real Braket local Rydberg (AHS) simulations**
-    (`source="LOCAL_AHS_SIM"`), the most faithful stand-in that exists without submitting.
-  - `results/prerun_150_results.json` — a **phenomenological** stand-in
-    (`source="SIMULATED_STANDIN"`) for the 150-atom headline, which the local simulator cannot
-    reach. It is a documented model (random-order greedy independent sets + loading defects),
-    **not** a quantum simulation and **not** QPU data. The notebook prints a banner saying so.
-
-  Before the event, run the real pre-runs (below) and overwrite `results/prerun_150_results.json`
-  with `source="QPU"`; the banner turns off automatically.
+### Run it
+On **qBraid Lab** (credentials pre-configured) or locally (`pip install -r requirements.txt`):
+open a notebook, select the kernel, **Restart & Run All**. The deck's three.js slides fetch
+three.js from unpkg and fonts from Google Fonts (network); `graph-stage` is fully offline.
+Everything replays from committed files — **no QPU job is submitted by opening a notebook.**
 
 ---
 
-## Files
+## Layout
 
 ```
-which_cells_can_sleep.ipynb   the demo AND the deck in one file (slides base64-embedded)
-sleepcells.py                 tested pipeline + printed reports: scale, graph, AHS, solvers, money
-sleepviz.py                   all matplotlib figures (Style + low/high-level plot helpers)
+which_towers_can_share_a_channel.ipynb   the deck + runnable code (slides are live iframes)
+qpu_result_widgets.ipynb                 interactive widgets over the real Aquila result
 requirements.txt
-data/
-  watthana_cells.csv          representative OpenCelliD-schema cells (generated)
-  DATA_PROVENANCE.md          honest provenance statement
-results/
-  sukhumvit_{150,20,16}.json  instances (atoms, graph, classical optima)
-  prerun_150_results.json     150-atom shots — SIMULATED_STANDIN (replace with QPU pre-run)
-  localsim_{20,16}_results.json   live-cell shots — LOCAL_AHS_SIM
-slides/
-  slide-01..13-*.png          the 13 presentation slides (embedded into the notebook's markdown)
-scripts/
-  generate_representative_data.py   rebuilds data/watthana_cells.csv
-  download_opencellid.py            fetch REAL OpenCelliD data (drop-in replacement)
-  prerun_experiments.py             rebuild instances + stand-in results
-  build_notebook.py                 assemble the .ipynb (embeds slides/ + wires the helpers)
+src/                 importable modules (added to sys.path by each notebook)
+  sleepcells.py        pipeline: scale, unit-disk graph, AHS program, classical solvers, reports
+  channels.py          iterated-MIS graph colouring + exact chromatic-number baseline
+  sleepviz.py          matplotlib figures
+  sleepwidgets.py      Plotly + ipywidgets result widgets (dark qBraid theme)
+  deckwidgets.py       renders each deck slide as a live sandboxed iframe (deck_slide)
+  nbsetup.py           environment bootstrap
+deck/                deck.dc.html + graph-stage.js / concept-figure.js / mapping-stage.js + assets/
+data/                real OpenCelliD extract (Watthana, MCC 520, True-group LTE/UMTS) + basemap
+results/             instances, real QPU shot stores, channel assignment, slide-map PNGs
+scripts/             build + experiment scripts (see below)
+slides/  resources/  legacy slide PNGs / device image
+docs/    examples/   source deck PDFs / notes; the standalone deck-animations demo
 ```
 
-**The notebook is the presentation.** There is no separate deck: each section shows the slide
-it explains (base64-embedded, so the `.ipynb` renders the whole talk with no external files),
-then the code proves it live. Presenter speaks to the slide; the cell output is the proof.
-Architecture: `sleepcells` = logic + printed reports, `sleepviz` = figures, notebook = thin
-orchestration + the slides.
-
-Regenerate everything from scratch:
+Key scripts (all run from the repo root):
 ```
-python scripts/generate_representative_data.py   # -> data/watthana_cells.csv
-python scripts/prerun_experiments.py             # -> results/*.json
-python scripts/build_notebook.py                 # -> which_cells_can_sleep.ipynb
+python scripts/build_deck_notebook.py     # assemble the deck notebook
+python scripts/mock_mis_2colour.py         # the 2-colour teaching demo
+python scripts/run_channel_qpu.py --plan   # price the iterated-MIS QPU run (submits nothing)
+python scripts/export_channel_map.py        # the channel-plan slide image
 ```
 
 ---
 
-## The real pre-runs (for the presenter, with submit access)
+## What is real
 
-The notebook contains the exact submission code (`aq.run(build_ahs_program(reg), shots=...)`).
-To produce real QPU data, in a submit-enabled qBraid environment:
+The frequency-reuse plan is grounded in **real quantum execution**. Every channel was measured
+on **QuEra Aquila** (1,000 shots per round), collected read-only:
 
-1. Build the 150-atom program (`sleepcells.build_ahs_program`), submit `3 × 1000` shots to
-   `aws:quera:qpu:aquila`, collect, and write the pre/post sequences into
-   `results/prerun_150_results.json` with `source="QPU"` (schema: `sleepcells.save_results`).
-2. Optionally sweep `Δ_start`, `Δ_end`, `t_ramp` to tune the approximation ratio first.
+- **Data** — `data/watthana_cells_real.csv`, a real **OpenCelliD** extract (MCC 520, True-group
+  LTE/UMTS), CC-BY-SA 4.0. Crowdsourced estimated positions, not surveyed towers. See
+  `data/DATA_PROVENANCE.md`.
+- **Result** — `results/channel_assignment_90_qpu.json` (`source="QPU_iterated"`): **90/90 towers
+  coloured in 5 measured MIS runs**, sizes `34 | 26 | 20 | 8 | 2`, a complete, valid colouring
+  (optimal is 4 — greedy overspent by one, the honest "greedy isn't optimal" moment). Round 1 hit
+  0.97 of the exact optimum; rounds 2–5 hit the exact maximum. Raw shots in
+  `results/headline_qpu_90_results.json` and `results/channel_qpu_round{2,3,4}_results.json`.
 
-Cost model (matches the live device): **30 credits/task + 1 credit/shot**. The full
-pre-run + rehearsal + stage budget is ~13,800 shots ≈ **15,700 credits** (see the spec).
+Jobs are submitted only by the presenter, from `scripts/run_channel_qpu.py --run-all` /
+`run_headline_qpu.py --submit`. Cost model: **30 credits/task + 1 credit/shot**.
 
 ---
 
-## Honesty constraints (baked in and printed)
+## Honesty constraints (printed by `sleepcells.print_assumptions`)
 
-- MIS is a **conservative relaxation** of the true optimum (complement of a minimum dominating
-  set): always feasible, may leave savings unclaimed.
-- Coverage is modelled as **uniform-radius disks**; real radii vary by band, tilt, class.
-- Positions are **crowdsourced estimated centroids**, not surveyed towers.
-- Site-merge counts are printed explicitly (`cells → sites → atoms`).
-- Every reported sleep set prints `COVERAGE VERIFIED`.
-- **No quantum advantage is claimed anywhere.**
+- **Protocol (unit-disk) model, not physical** — conflicts are binary and pairwise; real
+  interference aggregates and fails on a threshold ratio.
+- Coverage is **uniform-radius disks**; a fixed 500 m interference radius, not OpenCelliD's range.
+- Positions are **crowdsourced estimates**; colocated sectors collapse to one mast per site.
+- **Greedy colouring is not optimal** — an exact ILP / chromatic-number baseline runs alongside.
+- **No quantum advantage claimed** — CBC solves a 100-node MIS in milliseconds.
 
 ## References
-
 Ebadi et al., *Science* **376**, 1209 (2022) · Andrist et al., *Phys. Rev. Research* **5**,
 043277 (2023) · Cazals et al., *Phys. Rev. Applied* (2026) · Sarkar et al., arXiv:2511.09633 ·
-3GPP TS 38.300 §15.4 · AWS Braket developer guide (Aquila AHS schema).
+3GPP TS 38.300 §15.4 · AWS Braket developer guide (Aquila AHS) · Cell data © OpenCelliD, CC-BY-SA 4.0.

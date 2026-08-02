@@ -38,7 +38,7 @@ import time
 import numpy as np
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "src"))
 import sleepcells as sc  # noqa: E402
 
 DATA_CSV = os.path.join(HERE, "data", "watthana_cells_real.csv")   # REAL OpenCelliD extract

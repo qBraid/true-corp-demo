@@ -115,22 +115,24 @@ def _edge_xy(px, py, edges):
 # Styled shell (dark card + qBraid-themed controls)
 # --------------------------------------------------------------------------
 _CSS = f"""
-.qb-card {{ background: radial-gradient(120% 100% at 0% 0%, {CARD_TOP} 0%, {BG} 60%);
-  border:1px solid #1b2431; border-radius:16px; padding:18px 20px 12px;
-  font-family:{FONT}; color:{TEXT}; max-width:960px;
-  box-shadow:0 10px 44px rgba(0,0,0,.5); }}
+.qb-card {{ background: var(--jp-layout-color1, {CARD_TOP});
+  border:1px solid var(--jp-border-color2, #1b2431); border-radius:16px; padding:18px 20px 12px;
+  font-family:{FONT}; color:var(--jp-ui-font-color1, {TEXT}); max-width:960px;
+  box-shadow:0 8px 34px rgba(0,0,0,.30); }}
 .qb-card .qb-h {{ font-size:19px; font-weight:650; letter-spacing:.2px; margin:2px 0 4px;
-  display:flex; align-items:center; gap:9px; }}
-.qb-card .qb-h::before {{ content:''; width:9px; height:9px; border-radius:50%;
+  color:var(--jp-ui-font-color0, {TEXT}); display:flex; align-items:center; gap:9px; }}
+.qb-card .qb-h::before {{ content:''; width:9px; height:9px; border-radius:50%; flex:0 0 auto;
   background:{ACCENT}; box-shadow:0 0 12px {ACCENT}; }}
-.qb-card .qb-sub {{ color:{MUTED}; font-size:12.5px; margin:0 0 12px 18px; }}
-.qb-card .qb-cap {{ color:#aeb8c6; font-size:13.5px; line-height:1.5; margin:12px 2px 4px;
-  border-left:2px solid {ACCENT}; padding-left:11px; min-height:22px; }}
+.qb-card .qb-sub {{ color:var(--jp-ui-font-color2, {MUTED}); font-size:12.5px; margin:0 0 12px 18px; }}
+.qb-card .qb-cap {{ color:var(--jp-ui-font-color1, #aeb8c6); font-size:13.5px; line-height:1.5;
+  margin:12px 2px 4px; border-left:2px solid {ACCENT}; padding-left:11px; min-height:22px; }}
 .qb-card .widget-toggle-buttons .widget-toggle-button,
 .qb-card .widget-toggle-buttons button, .qb-card button.jupyter-button {{
   background:#131a23 !important; color:#c2ccd9 !important; border:1px solid #223046 !important;
   border-radius:10px !important; font-family:{FONT} !important; font-weight:550 !important;
-  margin-right:7px !important; padding:6px 14px !important; box-shadow:none !important;
+  margin-right:7px !important; padding:6px 16px !important; box-shadow:none !important;
+  text-align:center !important; display:inline-flex !important;
+  align-items:center !important; justify-content:center !important;
   transition:all .18s ease !important; }}
 .qb-card .widget-toggle-buttons button:hover, .qb-card button.jupyter-button:hover {{
   border-color:{ACCENT} !important; color:{TEXT} !important; }}
@@ -142,6 +144,7 @@ _CSS = f"""
 
 def _shell(title, subtitle, controls, fig, caption):
     import ipywidgets as W
+    controls.layout.margin = "0 0 16px 0"          # breathing room between buttons and the map
     css = W.HTML(f"<style>{_CSS}</style>")
     head = W.HTML(f"<div class='qb-h'>{title}</div><div class='qb-sub'>{subtitle}</div>")
     box = W.VBox([css, head, controls, fig, caption])
@@ -311,8 +314,128 @@ def sleep_view(inst, asleep, basemap_png, basemap_json, height=560):
 
 
 # --------------------------------------------------------------------------
+# WIDGET 3 — channel stepper: reveal the frequency-reuse plan one channel at a time
+# --------------------------------------------------------------------------
+CHANNEL_PALETTE = [ASLEEP, AWAKE, ACCENT, "#ffb020", "#4aa3ff", "#ff6fae", "#8ce06a"]
+
+
+def _residual_edge_xy(edges, revealed, px, py):
+    """Line coords for conflicts still unresolved: both endpoints not yet on a channel."""
+    ex, ey = [], []
+    for u, v in edges:
+        if u not in revealed and v not in revealed:
+            ex += [px[u], px[v], None]
+            ey += [py[u], py[v], None]
+    return ex, ey
+
+
+def build_channel_traces(fig, coords, edges, channels, ext, W, H):
+    """Traces: [0]=residual conflict edges, [1]=grey base (all towers),
+    [2..2+C-1]=one coloured trace per channel.
+
+    Initialised to the OPENING state (channel 1 revealed, edges = the residual after
+    channel 1) so a freshly-created FigureWidget PAINTS channel 1 red on first render —
+    property changes pushed before display don't always reach the frontend."""
+    import plotly.graph_objects as go
+    px, py = _project(coords[:, 0], coords[:, 1], ext, W, H)
+    revealed0 = set(channels[0]) if channels else set()
+    ex0, ey0 = _residual_edge_xy(edges, revealed0, px, py)
+    fig.add_trace(go.Scatter(x=ex0, y=ey0, mode="lines", name="conflicts",
+                             line=dict(color="rgba(150,160,175,0.40)", width=1), hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=px, y=py, mode="markers", name="unassigned", hoverinfo="skip",
+                             marker=dict(size=8, color="#55606f", opacity=0.9,
+                                         line=dict(color="#0b0f14", width=0.5))))
+    for c, nodes in enumerate(channels):
+        col = CHANNEL_PALETTE[c % len(CHANNEL_PALETTE)]
+        fig.add_trace(go.Scatter(x=px[nodes], y=py[nodes], mode="markers", name=f"channel {c+1}",
+                                 marker=dict(size=12, color=col, opacity=(1.0 if c == 0 else 0.0),
+                                             line=dict(color="white", width=0.6)),
+                                 hovertemplate=f"channel {c+1}<extra></extra>"))
+    return px, py
+
+
+def _channel_apply(fig, k, edges, channels, px, py, animate=True):
+    """Show channels 1..k: reveal their coloured towers, thin the residual conflicts."""
+    revealed = set(v for c in range(k) for v in channels[c])
+    ex, ey = _residual_edge_xy(edges, revealed, px, py)
+    with _apply_ctx(fig, animate):
+        fig.data[0].x = ex
+        fig.data[0].y = ey
+        for c in range(len(channels)):
+            fig.data[2 + c].marker.opacity = 1.0 if c < k else 0.0
+
+
+def channel_stepper_view(assignment, edges, basemap_png, basemap_json, height=560):
+    """Step through a frequency-reuse plan one channel at a time on the dark map.
+
+    assignment : the loaded channel-assignment dict (channels, coords_lonlat, ...).
+    edges      : the conflict-graph edges (list of [u, v]) — for the residual overlay.
+    """
+    import numpy as np
+    import plotly.graph_objects as go
+    import ipywidgets as W
+    uri, Wpx, Hpx, ext, attr = _basemap(basemap_png, basemap_json)
+    coords = np.asarray(assignment["coords_lonlat"], float)
+    channels = [list(c) for c in assignment["channels"]]
+    N = len(channels)
+    total = sum(len(c) for c in channels)
+    edges = [tuple(e) for e in edges]
+
+    fig = go.FigureWidget(_base_figure(uri, Wpx, Hpx, attr, height))
+    px, py = build_channel_traces(fig, coords, edges, channels, ext, Wpx, Hpx)
+
+    def residual_after(k):
+        revealed = set(v for c in range(k) for v in channels[c])
+        return sum(1 for u, v in edges if u not in revealed and v not in revealed)
+
+    src = assignment.get("source", "")
+    chi = assignment.get("chromatic_number")
+    opts = [(f"{'▶ ' if k == 1 else '+'} ch {k}", k) for k in range(1, N + 1)]
+    steps_caps = []
+    for k in range(1, N + 1):
+        on = sum(len(channels[c]) for c in range(k))
+        left = residual_after(k)
+        note = ("<b>every conflict resolved</b> — the whole district runs on "
+                f"<b>{N} frequencies</b>." if left == 0 else
+                f"<b>{left} conflicts still unresolved</b> among the {total-on} un-channelled towers.")
+        col = CHANNEL_PALETTE[(k - 1) % len(CHANNEL_PALETTE)]
+        steps_caps.append(
+            f"Channels 1–{k} lit · <b>{on} of {total}</b> towers on "
+            f"<span style='color:{col}'>{k} frequenc{'y' if k == 1 else 'ies'}</span>. {note}")
+
+    toggle = W.ToggleButtons(options=opts, value=1)
+    toggle.add_class("widget-toggle-buttons")
+    cap = W.HTML(_cap(steps_caps[0]))
+
+    def _on(change):
+        _channel_apply(fig, change["new"], edges, channels, px, py)
+        cap.value = _cap(steps_caps[change["new"] - 1])
+    toggle.observe(_on, names="value")
+    _channel_apply(fig, 1, edges, channels, px, py, animate=False)
+
+    opt = "" if chi is None else (" · optimal is " + str(chi) +
+                                  (" (greedy overspent by %d)" % (N - chi) if N > chi else " (optimal)"))
+    sub = (f"Repeated MIS → graph colouring. {N} channels" + opt +
+           (" · every channel measured on Aquila" if src == "QPU_iterated" else ""))
+    return _shell("Frequency reuse — one MIS per channel", sub, toggle, fig, cap)
+
+
+# --------------------------------------------------------------------------
 # Static export (for headless verification): plain go.Figure at a given state
 # --------------------------------------------------------------------------
+def _static_channel(assignment, edges, basemap_png, basemap_json, k, height=560):
+    import numpy as np
+    import plotly.graph_objects as go
+    uri, Wpx, Hpx, ext, attr = _basemap(basemap_png, basemap_json)
+    fig = go.Figure(_base_figure(uri, Wpx, Hpx, attr, height))
+    coords = np.asarray(assignment["coords_lonlat"], float)
+    channels = [list(c) for c in assignment["channels"]]
+    edges = [tuple(e) for e in edges]
+    px, py = build_channel_traces(fig, coords, edges, channels, ext, Wpx, Hpx)
+    _channel_apply(fig, k, edges, channels, px, py, animate=False)
+    return fig
+
+
 def _static_pipeline(inst, basemap_png, basemap_json, state, height=560):
     import plotly.graph_objects as go
     uri, Wpx, Hpx, ext, attr = _basemap(basemap_png, basemap_json)
