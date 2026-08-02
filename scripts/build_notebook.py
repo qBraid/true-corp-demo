@@ -21,8 +21,8 @@ def slide(fname, width=1000):
     with open(os.path.join(SLIDES, fname), "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     return (f'<img src="data:image/png;base64,{b64}" width="{width}" '
-            f'style="max-width:100%;height:auto;border:1px solid #ececec;'
-            f'border-radius:8px;margin:0.4em 0;" alt="{fname}" />')
+            f'style="max-width:100%;height:auto;border-radius:8px;'
+            f'box-shadow:0 1px 10px rgba(0,0,0,0.30);margin:0.5em 0;" alt="{fname}" />')
 
 # ==========================================================================
 # TITLE
@@ -99,7 +99,7 @@ print(f"COVERAGE_OVERLAP_M = {COVERAGE_OVERLAP_M:.0f} m   LIVE_ATOMS = {LIVE_ATO
 
 md(r"""
 ### Assumptions
-""" + slide("slide-12-assumptions.png") + r"""
+""" + slide("slide-13-assumptions.png") + r"""
 """)
 
 code(r"""
@@ -170,8 +170,8 @@ else:
 # ==========================================================================
 md(r"""
 ## 2 · WHY — at 3 a.m. the network is awake, almost nobody is
-""" + slide("slide-02-problem.png") + "\n\n" + slide("slide-03-why-now.png") + "\n\n"
-   + slide("slide-04-the-blocker.png") + r"""
+""" + slide("slide-05-problem.png") + "\n\n" + slide("slide-06-why-now.png") + "\n\n"
+   + slide("slide-07-blocker.png") + r"""
 
 *The joint decision — which cells can sleep **together** without opening a hole — is the
 NP-hard part nobody solves. The network team does not need a better guess; it needs a
@@ -183,7 +183,7 @@ NP-hard part nobody solves. The network team does not need a better guess; it ne
 # ==========================================================================
 md(r"""
 ## 3 · WHAT — the coverage problem is Maximum Independent Set
-""" + slide("slide-05-formulation.png") + r"""
+""" + slide("slide-02-ten-towers.png") + "\n\n" + slide("slide-03-formulation.png") + r"""
 
 *Draw an edge between any two sites whose coverage overlaps (within 500 m); a safe sleep
 pattern is then an **independent set**, and sleeping as many as possible is **Maximum
@@ -255,7 +255,7 @@ print(f"\nwall-clock       : {dt:.1f} s   (target < 60 s)")
 # ==========================================================================
 md(r"""
 ## 5 · HOW — that shape is also the shape of the machine
-""" + slide("slide-06-mapping.png") + r"""
+""" + slide("slide-04-mapping.png") + r"""
 
 *Two atoms within the **Rydberg blockade radius** physically cannot both be excited — that
 **is** the coverage constraint, enforced by rubidium, not a penalty term we added. Sweeping
@@ -284,7 +284,7 @@ viz.three_panel(live_inst, live_reg, live_G)      # returned figure is the cell'
 # ==========================================================================
 md(r"""
 ## 6 · RESULT 1 — Sukhumvit on 150 atoms
-""" + slide("slide-07-experiment.png") + "\n\n" + slide("slide-08-result.png") + r"""
+""" + slide("slide-08-experiment.png") + "\n\n" + slide("slide-09-result.png") + r"""
 
 *The slide is the claim; the cells below are the proof. We load the pre-run measurements, read
 out which cells sleep, verify the coverage certificate live, and put a number in baht on it.*
@@ -314,7 +314,7 @@ viz.payoff_map(inst150, best150)
 
 md(r"""
 ### The value — ฿30–75M a year, on True's own constants
-""" + slide("slide-11-value.png") + r"""
+""" + slide("slide-12-value.png") + r"""
 
 *Every baht below is built on True's own published numbers, so only the physical assumptions
 are arguable — and reachable **today with a classical solver**. Quantum's contribution to this
@@ -331,7 +331,7 @@ sc.print_money(len(best150), 150)
 # ==========================================================================
 md(r"""
 ## 7 · RESULT 2 — the honest scoreboard
-""" + slide("slide-09-scoreboard.png") + "\n\n" + slide("slide-10-the-gap.png") + r"""
+""" + slide("slide-10-scoreboard.png") + "\n\n" + slide("slide-11-gap.png") + r"""
 
 *Classical won today — we show by how much: wall-clock, approximation ratio, and the shot
 distribution Aquila returns. The real gap to advantage is not qubit count; it is **shot rate**.*
@@ -419,7 +419,7 @@ print(f"agreement        : {label} and the live-cell simulator {agree} on the sl
 # ==========================================================================
 md(r"""
 ## 9 · WHAT THIS MEANS
-""" + slide("slide-13-path-forward.png") + r"""
+""" + slide("slide-14-path-forward.png") + r"""
 
 *Apply, don't build. This notebook opens in a browser — **any Thai student can run tonight's
 experiment tomorrow, on the same hardware.** One industry, one honest benchmark, and the
