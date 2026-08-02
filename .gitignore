@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# qBraid SDK source clone — kept locally for development, not part of this repo
+qBraid/
