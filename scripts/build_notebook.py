@@ -180,7 +180,8 @@ md(r"""
 ## 6 · Load Sukhumvit and build the coverage graph
 
 *Cell-tower positions are a real OpenCelliD extract — crowdsourced estimates, not surveyed
-towers (data © OpenCelliD, CC-BY-SA 4.0).*
+towers (data © OpenCelliD, CC-BY-SA 4.0). Only **LTE/UMTS** are sleep candidates; GSM stays
+awake as the 2G coverage floor.*
 """)
 
 code(r"""
@@ -190,7 +191,7 @@ fdf = sc.filter_cells(df)
 sites = sc.cluster_cells_to_sites(fdf, CENTER[0], CENTER[1], radius_m=50.0)
 atoms = sc.merge_close_sites(sites)
 
-sc.print_merge_counts(sites, atoms, df)
+sc.print_merge_counts(sites, atoms, fdf)     # fdf = the True-group LTE/UMTS cells actually used
 """)
 
 code(r"""
