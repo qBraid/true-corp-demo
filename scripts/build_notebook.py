@@ -43,7 +43,7 @@ md(r"""
 code(r"""
 import sys, os, json, time, math, warnings, inspect
 warnings.filterwarnings("ignore")
-sys.path.insert(0, os.getcwd())          # make the local modules importable on Lab
+sys.path.insert(0, os.path.join(os.getcwd(), 'src'))          # make the local modules importable on Lab
 
 import nbsetup
 nbsetup.ensure_environment()             # install anything missing on a fresh kernel

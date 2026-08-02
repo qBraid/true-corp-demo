@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<x-dc>
+
+<section data-label="Title" data-screen-label="01" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;pointer-events:none"><img src="assets/sukhumvit-basemap.png" alt="" style="width:100%;height:100%;object-fit:cover;opacity:0.85;display:block"><div style="position:absolute;inset:0;background:linear-gradient(90deg, rgba(10,10,11,0.85) 0%, rgba(10,10,11,0.55) 45%, rgba(10,10,11,0.15) 100%)"></div></div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;position:relative">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450">EDUCATIONAL DEMONSTRATION · QUANTUM CLUB THAILAND</div>
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">01</span> / 11</div>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:1.05fr 0.95fr;gap:80px;align-items:center;padding-top:24px;position:relative">
+    <div style="display:flex;flex-direction:column;gap:44px">
+      <h1 style="margin:0;font-size:78px;line-height:1.05;letter-spacing:-0.035em;font-weight:800;color:#ECE9E0;text-wrap:pretty">Which towers can<br>share a channel?</h1>
+      <p style="margin:0;font-size:32px;line-height:1.5;color:#8A8580;max-width:32ch;text-wrap:pretty">A lesson in Maximum Independent Set, told through cell-tower channel assignment: how many towers in Sukhumvit can transmit on one slice of spectrum and solved on a quantum device?</p>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:20px;letter-spacing:0.14em;color:#575450">DELIVERED BY</div>
+        <div style="display:flex;align-items:center;gap:36px">
+          <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:44px;width:auto;display:block">
+          <span style="font-size:26px;color:#575450">×</span>
+          <img src="assets/qtric-mark-light.png" alt="QTRiC" style="height:44px;width:auto;display:block">
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;align-items:center;min-height:0">
+      <x-import component-from-global-scope="graph-stage" from="./graph-stage.js" mode="coloring" bare="1" hint-size="100%,100%" style="width:100%;height:560px;max-width:820px;display:block"></x-import>
+    </div>
+  </div>
+  <div style="border-top:1px solid rgba(236,233,224,0.10);padding-top:26px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:21px;letter-spacing:0.04em;color:#575450;position:relative">3 August 2026 · Grand Hall, True Digital Park (West), Bangkok · Prepared for True Corporation, MHESI and QTRiC · © qBraid 2026</div>
+</section>
+
+<section data-label="The problem" data-screen-label="02" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">02</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px">THE PROBLEM</div>
+  <h2 style="margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">Spectrum is licensed, finite and expensive.<br>Interference is what reuse costs.</h2>
+  <div style="flex:1;display:grid;grid-template-columns:1.05fr 1fr;gap:72px;align-items:center;padding-top:24px;min-height:0"><div style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
+      <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:18px"><div style="font-size:44px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0">~100 MHz</div><div style="font-size:23px;line-height:1.4;color:#8A8580">of licensed spectrum for a Bangkok operator — a handful of usable carriers</div></div>
+      <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:18px"><div style="font-size:44px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0">1000s</div><div style="font-size:23px;line-height:1.4;color:#8A8580">of masts must share those carriers — frequency reuse is forced</div></div>
+      <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:18px"><div style="font-size:44px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0">0 dB</div><div style="font-size:23px;line-height:1.4;color:#8A8580">SINR mid-overlap — both towers equally loud, nothing decodable</div></div>
+      <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:18px"><div style="font-size:44px;font-weight:300;letter-spacing:-0.03em;color:#9F6CFF">2R</div><div style="font-size:23px;line-height:1.4;color:#8A8580">the conflict rule: discs of radius R overlap exactly when towers sit closer than 2R</div></div>
+    </div>
+      <div style="display:flex;flex-direction:column;gap:20px;min-height:0;height:100%">
+      <div style="flex:1;min-height:320px;position:relative;border-radius:8px;overflow:hidden;border:1px solid rgba(236,233,224,0.10);background:radial-gradient(ellipse 80% 80% at 40% 45%, rgba(159,108,255,0.12), transparent 70%), #101012"><svg viewBox="0 0 782 540" style="position:absolute;inset:0;width:100%;height:100%;display:block"><defs><radialGradient id="ca" cx="34%" cy="50%" r="42%"><stop offset="0" stop-color="rgba(179,137,255,0.30)"/><stop offset="1" stop-color="rgba(179,137,255,0)"/></radialGradient><radialGradient id="cb" cx="66%" cy="50%" r="42%"><stop offset="0" stop-color="rgba(74,222,128,0.28)"/><stop offset="1" stop-color="rgba(74,222,128,0)"/></radialGradient></defs><circle cx="266" cy="270" r="230" fill="url(#ca)"/><circle cx="516" cy="270" r="230" fill="url(#cb)"/><circle cx="266" cy="270" r="230" fill="none" stroke="rgba(179,137,255,0.5)" stroke-dasharray="5 8"/><circle cx="516" cy="270" r="230" fill="none" stroke="rgba(74,222,128,0.45)" stroke-dasharray="5 8"/><circle cx="266" cy="270" r="8" fill="#B389FF"/><circle cx="516" cy="270" r="8" fill="#4ade80"/><text x="391" y="180" fill="#f5a35c" font-family="JetBrains Mono, monospace" font-size="26" text-anchor="middle">SINR ≈ 0 dB</text><path d="M360 260 l62 0 M391 229 l0 62" stroke="#f5a35c" stroke-width="4" stroke-linecap="round"/></svg></div>
+      <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580"></p>
+    </div>
+  </div>
+</section>
+
+<section data-label="Why now" data-screen-label="03" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">03</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px">WHY TOWERS CONFLICT</div>
+  <h2 style="margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">Nothing is wrong with the towers.<br>The conflict lives <i>at the receiver</i></h2>
+  <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:36px;align-items:stretch;align-content:start;padding-top:30px">
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:22px"><div style="height:210px;position:relative"><x-import component-from-global-scope="concept-figure" from="./concept-figure.js" kind="language" hint-size="100%,210px" style="position:absolute;inset:0;width:100%;height:100%;display:block"></x-import></div><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.1em;color:#9F6CFF">/ 01</div><div style="font-size:31px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">A channel is a language</div><p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">Everyone shouting in the same language interferes with everyone else in it. Any tower can tune to any carrier — there is no per-tower incompatibility.</p></div>
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:22px"><div style="height:210px;position:relative"><x-import component-from-global-scope="concept-figure" from="./concept-figure.js" kind="power" hint-size="100%,210px" style="position:absolute;inset:0;width:100%;height:100%;display:block"></x-import></div><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.1em;color:#9F6CFF">/ 02</div><div style="font-size:31px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">Two overlapping towers conflict</div><p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">Mid-overlap, both towers arrive equally loud: SINR ≈ 0 dB. Raising power lifts signal and interference together; the phone hears the other tower as noise.</p></div>
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:22px"><div style="height:210px;position:relative"><x-import component-from-global-scope="concept-figure" from="./concept-figure.js" kind="scheduling" hint-size="100%,210px" style="position:absolute;inset:0;width:100%;height:100%;display:block"></x-import></div><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.1em;color:#9F6CFF">/ 03</div><div style="font-size:31px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">Still true in 5G</div><p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">Modern networks run reuse-1 and manage interference in the scheduler: two conflicting cells cannot share a resource block in the same subframe. Same graph, one layer down.</p></div>
+  </div>
+  <div style="border-left:2px solid #9F6CFF;background:#101012;padding:22px 28px;margin-bottom:22px;font-size:27px;line-height:1.45;color:#ECE9E0">Two towers conflict exactly when some point exists where the interferer is above the noise floor while the server is still in range. Overlapping coverage discs are exactly that condition.</div>
+</section>
+
+<section data-label="What we solve" data-screen-label="04" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">04</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px">WHAT WE ARE SOLVING</div>
+  <h2 style="margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">A district of towers. A handful of licensed channels.</h2>
+  <div style="margin-top:18px;font-size:32px;line-height:1.25;letter-spacing:-0.025em;font-weight:400;color:#B389FF;text-shadow:0 0 38px rgba(159,108,255,0.4)">Which towers can transmit on the same channel — with every phone still able to decode?</div>
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start;padding-top:16px;min-height:0;overflow:hidden">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <p style="margin:0;font-size:25px;line-height:1.45;color:#8A8580">Picture a hall where everyone has to shout. Stand near one shouter and you can follow them. Stand between two, and both arrive equally loud, so you follow neither. Towers are the shouters, phones are the listeners, and a channel is the language they shout in.</p>
+      <p style="margin:0;font-size:25px;line-height:1.45;color:#8A8580">Draw every tower as a dot, and a line between any two that would ruin each other. Now the question is just: pick as many dots as you can with no line between them.</p>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:0">
+      <div style="position:relative;width:786px;height:484px"><x-import component-from-global-scope="mapping-stage" from="./mapping-stage.js" bare="1" hint-size="100%,100%" style="position:absolute;inset:0;width:100%;height:100%;display:block"></x-import></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,340px));justify-content:start;gap:20px;padding:2px 0 16px">
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:26px 28px;display:flex;flex-direction:column;gap:12px"><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:20px;letter-spacing:0.12em;color:#575450">TOO AGGRESSIVE</div><div style="font-size:30px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">Get it wrong</div><div style="font-size:23px;line-height:1.4;color:#8A8580">Phones in the overlap get nothing.</div></div>
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:26px 28px;display:flex;flex-direction:column;gap:12px"><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:20px;letter-spacing:0.12em;color:#575450">TOO CAUTIOUS</div><div style="font-size:30px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">Get it safe</div><div style="font-size:23px;line-height:1.4;color:#8A8580">A channel each, and the spectrum bill explodes.</div></div>
+    <div style="background:rgba(74,222,128,0.07);border:1px solid rgba(74,222,128,0.45);border-radius:8px;padding:26px 28px;display:flex;flex-direction:column;gap:12px"><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:20px;letter-spacing:0.12em;color:#4ade80">WHAT WE WANT</div><div style="font-size:30px;font-weight:500;letter-spacing:-0.025em;color:#4ade80">Get it right</div><div style="font-size:23px;line-height:1.4;color:#8A8580">The most towers on one channel, cleanly.</div></div>
+  </div>
+</section>
+
+<section data-label="Formulation" data-screen-label="05" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">05</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px">FORMULATION</div>
+  <h2 style="margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">This problem already has a name:<br><span style="color:#B389FF">Maximum Independent Set</span>.</h2>
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:start;padding-top:28px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:20px;min-height:0">
+      <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">When two <b>towers overlap, we draw an edge</b> between them. Now it is a graph, and the question is a maths one: find the largest set of dots with no edge between any two. That set is channel 1.</p>
+      <x-import component-from-global-scope="graph-stage" from="./graph-stage.js" mode="mis" hint-size="100%,100%" style="width:100%;height:400px;border:1px solid rgba(236,233,224,0.10);border-radius:8px;background:#0a0a0b;display:block"></x-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;min-height:0">
+      <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">It is NP-hard, and solving it exactly means holding the whole cluster in view at once.</p>
+      <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:22px 26px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-size:26px;font-weight:700;letter-spacing:-0.015em;color:#ECE9E0">Why this is the hard part</div>
+        <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">The choices interlock. Pick one tower and its neighbours are out, which frees their neighbours, and so on across the district. A local rule never sees that chain.</p>
+      </div>
+      <svg viewBox="0 0 860 520" style="width:100%;max-height:290px;display:block" aria-hidden="true">
+        <g stroke="rgba(236,233,224,0.10)" stroke-width="2"><path d="M150 40 H830 M150 165 H830 M150 290 H830 M150 415 H830"></path></g>
+        <g font-family="JetBrains Mono, monospace" font-size="22" fill="#575450" text-anchor="end"><text x="130" y="48">1 day</text><text x="130" y="173">1 hr</text><text x="130" y="298">1 min</text><text x="130" y="423">1 s</text><text x="130" y="500">0.01 s</text></g>
+        <path d="M160 492 L300 420 L420 330 L520 235 L620 120 L700 30" fill="none" stroke="#60a5fa" stroke-width="6"></path>
+        <text x="712" y="34" font-family="JetBrains Mono, monospace" font-size="24" fill="#60a5fa">classical</text>
+        <path d="M300 225 H660" stroke="#9F6CFF" stroke-width="7"></path>
+        <text x="676" y="233" font-family="JetBrains Mono, monospace" font-size="24" fill="#9F6CFF">Aquila today</text>
+        <path d="M300 415 H820" stroke="#B389FF" stroke-width="6" stroke-dasharray="14 12"></path>
+        <text x="540" y="400" font-family="JetBrains Mono, monospace" font-size="24" fill="#B389FF">1000 atoms @ 1 kHz</text>
+        <text x="470" y="470" font-family="JetBrains Mono, monospace" font-size="22" fill="#575450" text-anchor="middle">sites →</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section data-label="Colouring" data-screen-label="06" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;pointer-events:none"><img src="assets/sukhumvit-basemap.png" alt="" style="width:100%;height:100%;object-fit:cover;opacity:0.85;display:block"><div style="position:absolute;inset:0;background:linear-gradient(90deg, rgba(10,10,11,0.85) 0%, rgba(10,10,11,0.55) 45%, rgba(10,10,11,0.15) 100%)"></div></div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;position:relative">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">06</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px;position:relative">FROM ONE CHANNEL TO A FULL PLAN</div>
+  <h2 style="position:relative;margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">One MIS is a single channel.<br><span style="color: rgb(179, 137, 255);">Repeat</span> until every tower has one.</h2>
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:start;padding-top:28px;min-height:0;position:relative">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">The leftovers are <b>not</b> towers that can never share. They just missed channel 1. Most of them get along fine with each other.</p>
+      <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">So take the set, remove it, and run again on what is left. Each round is one channel. The number of rounds is how much spectrum the district needs.</p>
+      <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:22px 26px;display:flex;flex-direction:column;gap:18px">
+        <div style="font-size:26px;font-weight:700;letter-spacing:-0.015em;color:#ECE9E0">To Note</div>
+        <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">Going greedy does not guarantee the fewest channels. On a worked 26-tower example it needs 5 where 4 would do, because grabbing the biggest set first strands the busiest tower. Finding the true minimum is a harder problem again.</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:0">
+      <div style="position:relative;width:100%;height:520px;max-width:760px"><x-import component-from-global-scope="graph-stage" from="./graph-stage.js" mode="coloring" bare="1" hint-size="100%,100%" style="position:absolute;inset:0;width:100%;height:100%;display:block"></x-import></div>
+    </div>
+  </div>
+</section>
+
+<section data-label="The experiment" data-screen-label="07" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%;position:relative;overflow:hidden">
+  <div style="position:absolute;top:-6%;right:-16%;width:78%;height:112%;pointer-events:none"><img src="assets/watthana-conflict-graph.png" alt="The 90-atom Watthana conflict graph on the Sukhumvit basemap" style="width:100%;height:100%;object-fit:cover;display:block;-webkit-mask-image:radial-gradient(ellipse 62% 62% at 52% 50%, black 42%, transparent 100%);mask-image:radial-gradient(ellipse 62% 62% at 52% 50%, black 42%, transparent 100%)"></div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;position:relative">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">07</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px;position:relative">THE EXPERIMENT</div>
+  <h2 style="position:relative;margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">Watthana district, on 90 atoms.</h2>
+  <div style="flex:1;display:grid;grid-template-columns:0.82fr 1.18fr;gap:72px;align-items:start;padding-top:28px;min-height:0;position:relative">
+    <div style="display:flex;flex-direction:column;gap:20px;position:relative">
+      <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580"><b>Real OpenCelliD data for Watthana</b>: 3,401 True-group LTE and UMTS cells, collapsed to 851 masts, then merged at the 238 m floor to 116 atoms. The densest 90 fit inside Aquila's 75 µm field, and those are the ones we run.</p>
+      <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">Positions are crowdsourced estimates, not surveyed towers, and the interference radius is a fixed 500 m rather than OpenCelliD's range column.</p>
+      <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:22px 26px;display:flex;flex-direction:column;gap:18px">
+        <div style="font-size:26px;font-weight:700;letter-spacing:-0.015em;color:#ECE9E0">The hardware</div>
+        <p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">QuEra Aquila, 256 neutral rubidium atoms, submitted through qBraid Lab. A quasi-adiabatic detuning sweep over 4 µs, 1,000 shots per task.</p>
+      </div>
+    </div>
+    <div></div>
+  </div>
+</section>
+
+<section data-label="Mapping" data-screen-label="08" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">08</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px">THE MAPPING</div>
+  <h2 style="margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">We map the shape of the network on to the arrangement of atoms.</h2>
+<div style="flex:1;display:grid;grid-template-columns:1fr 470px;gap:44px;min-height:0;padding:26px 0 18px">
+    <div style="min-height:0;display:flex;flex-direction:column;gap:16px">
+      <div style="position:relative;flex:1;min-height:0"><x-import component-from-global-scope="mapping-stage" from="./mapping-stage.js" bare="1" hint-size="100%,100%" style="position:absolute;inset:0;width:100%;height:100%;display:block"></x-import></div>
+    </div>
+    <div style="display:flex;flex-direction:column;justify-content:center;min-height:0">
+      <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:20px;letter-spacing:0.12em;color:#B389FF;padding-bottom:6px">THE CONVERSION</div>
+      <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(236,233,224,0.10);padding:18px 0"><div style="font-size:38px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0">1 µm = 59.5 m</div><div style="font-size:22px;line-height:1.4;color:#8A8580">the scale factor set by the blockade</div></div>
+      <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(236,233,224,0.10);padding:18px 0"><div style="font-size:38px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0">8.4 µm</div><div style="font-size:22px;line-height:1.4;color:#8A8580">blockade radius ≈ 500 m interference radius</div></div>
+      <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(236,233,224,0.10);padding:18px 0"><div style="font-size:38px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0">4 µm</div><div style="font-size:22px;line-height:1.4;color:#8A8580">atom-spacing floor = 238 m, so closer masts are merged</div></div>
+      <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(236,233,224,0.10);padding:18px 0"><div style="font-size:38px;font-weight:300;letter-spacing:-0.03em;color:#9F6CFF">90 / 116</div><div style="font-size:22px;line-height:1.4;color:#8A8580">Watthana atoms that fit the 75 µm field of view</div></div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Result" data-screen-label="09" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%;position:relative;overflow:hidden">
+  <div style="position:absolute;top:-6%;right:-14%;width:70%;height:112%;pointer-events:none"><img src="assets/watthana-channel-plan.png" alt="Every Watthana tower coloured by its assigned channel" style="width:100%;height:100%;object-fit:cover;display:block;-webkit-mask-image:radial-gradient(ellipse 62% 62% at 52% 50%, black 42%, transparent 100%);mask-image:radial-gradient(ellipse 62% 62% at 52% 50%, black 42%, transparent 100%)"></div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;position:relative">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">09</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px;position:relative">RESULT</div>
+  <h2 style="position:relative;margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">All 90 towers coloured, in <span style="background:rgba(159,108,255,0.14);padding:0 12px;border-radius:4px">5</span> MIS runs on the quantum device.</h2>
+  <div style="flex:1;display:grid;grid-template-columns:0.94fr 1.06fr;gap:56px;align-items:start;padding-top:28px;min-height:0;position:relative">
+    <div style="display:flex;flex-direction:column;gap:28px;position:relative">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
+        <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:28px 28px;display:flex;flex-direction:column;gap:16px"><div style="font-size:42px;font-weight:300;letter-spacing:-0.03em;color:#9F6CFF"><span style="background:rgba(159,108,255,0.14);padding:0 10px;border-radius:4px;color:#ECE9E0">90</span>/90</div><div style="font-size:23px;line-height:1.4;color:#8A8580">towers assigned a channel, a complete and valid colouring</div></div>
+        <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:28px 28px;display:flex;flex-direction:column;gap:16px"><div style="font-size:42px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0"><span style="background:rgba(159,108,255,0.14);padding:0 10px;border-radius:4px">4</span>/5</div><div style="font-size:23px;line-height:1.4;color:#8A8580">rounds hit the exact classical maximum; the 90-atom round came in at 0.97 (34 of 35)</div></div>
+        <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:28px 28px;display:flex;flex-direction:column;gap:16px"><div style="font-size:42px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0"><span style="background:rgba(159,108,255,0.14);padding:0 10px;border-radius:4px">5</span> runs</div><div style="font-size:23px;line-height:1.4;color:#8A8580">MIS runs on Aquila, one per channel, at 1,000 shots each</div></div>
+        <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:28px 28px;display:flex;flex-direction:column;gap:16px"><div style="font-size:34px;font-weight:300;letter-spacing:-0.03em;color:#ECE9E0;white-space:nowrap"><span style="background:rgba(159,108,255,0.14);padding:0 10px;border-radius:4px">34 | 26 | 20 | 8 | 2</span></div><div style="font-size:23px;line-height:1.4;color:#8A8580">towers per channel, round by round, from the measured runs</div></div>
+      </div>
+      <div style="border-left:2px solid #9F6CFF;background:#101012;padding:22px 28px;font-size:27px;line-height:1.45;color:#ECE9E0">Every round validated in the notebook: each channel is a genuine independent set in the real graph, maximal, and a correct subset of its residual. The partition is complete and disjoint, 90 of 90, a proper colouring.</div>
+    </div>
+    <div></div>
+  </div>
+</section>
+
+<section data-label="Path forward" data-screen-label="10" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">10</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px">PATH FORWARD</div>
+  <h2 style="margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">Apply, and build <span style="color:#B389FF;text-shadow:0 0 40px rgba(159,108,255,0.65), 0 0 14px rgba(159,108,255,0.45)">the ecosystem</span>.</h2>
+  <p style="margin:32px 0 0;font-size:24px;line-height:1.5;color:#8A8580;max-width:96ch">"Rather than building quantum computers, we will focus on applying quantum technologies to create value in industries where Thailand already has strengths." — the National Quantum Economy Strategy, approved 24 June 2026.</p>
+  <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:36px;align-items:start;padding-top:28px">
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:22px"><div style="display:flex;gap:28px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.1em;color:#9F6CFF"><span>/ 01</span><span>APPLICATION</span></div><div style="font-size:31px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">Industrial application</div><p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">A 90-day pilot on real network data. Classical solver as the production baseline, quantum benchmark alongside. Measured against exact classical optima.</p></div>
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:22px"><div style="display:flex;gap:28px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.1em;color:#9F6CFF"><span>/ 02</span><span>BENCHMARK</span></div><div style="font-size:31px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">The annual benchmark</div><p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">True, QTRiC and qBraid co-author the crossover study — instance hardness, shot rate, approximation ratio. Published, repeated yearly.</p></div>
+    <div style="background:#101012;border:1px solid rgba(236,233,224,0.10);border-radius:8px;padding:30px 28px;display:flex;flex-direction:column;gap:22px"><div style="display:flex;gap:28px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.1em;color:#9F6CFF"><span>/ 03</span><span>TRAINING</span></div><div style="font-size:31px;font-weight:500;letter-spacing:-0.025em;color:#ECE9E0">Workforce</div><p style="margin:0;font-size:24px;line-height:1.5;color:#8A8580">This notebook opens in a browser. Any student at any Thai university can run tonight's experiment tomorrow morning, on the same hardware.</p></div>
+  </div>
+</section>
+
+<section data-label="Assumptions" data-screen-label="11" style="display:flex;flex-direction:column;padding:52px 88px 44px;background:#0a0a0b;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;color:#ECE9E0;box-sizing:border-box;height:100%">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <img src="assets/qbraid-wordmark-white.png" alt="qBraid" style="height:25px;width:auto;display:block">
+    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;letter-spacing:0.08em;color:#575450"><span style="color:#8A8580">11</span> / 11</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;letter-spacing:0.14em;color:#575450;margin-top:34px">ASSUMPTIONS</div>
+  <h2 style="margin:14px 0 0;font-size:52px;line-height:1.1;letter-spacing:-0.035em;font-weight:300;color:#ECE9E0">Assumptions for the presentation</h2>
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:30px 64px;align-content:start;padding-top:30px">
+    <div style="display:flex;gap:20px;font-size:27px;line-height:1.5"><span style="color:#575450">•</span><span style="color:#8A8580"><strong style="color:#ECE9E0;font-weight:500">Protocol model, not physical model.</strong> Conflicts are binary and pairwise. Real interference aggregates — twenty towers each below the noise floor can sum above it — and fails on a threshold ratio, not equality.</span></div>
+    <div style="display:flex;gap:20px;font-size:27px;line-height:1.5"><span style="color:#575450">•</span><span style="color:#8A8580"><strong style="color:#ECE9E0;font-weight:500">Discs are not discs.</strong> Sectorised antennas radiate lobes and high-rise Bangkok is anisotropic. Unit disks are the abstraction — the same one Rydberg blockade implements natively.</span></div>
+    <div style="display:flex;gap:20px;font-size:27px;line-height:1.5"><span style="color:#575450">•</span><span style="color:#8A8580"><strong style="color:#ECE9E0;font-weight:500">Fixed interference radius.</strong> OpenCelliD's range column is measurement confidence, not coverage. We use a fixed 500 m urban-LTE radius; masts within ~240 m are merged to fit the 4 µm atom floor.</span></div>
+    <div style="display:flex;gap:20px;font-size:27px;line-height:1.5"><span style="color:#575450">•</span><span style="color:#8A8580"><strong style="color:#ECE9E0;font-weight:500">Crowdsourced positions.</strong> OpenCelliD estimated centroids, not surveyed towers. Colocated sectors are collapsed to one mast per site.</span></div>
+    <div style="display:flex;gap:20px;font-size:27px;line-height:1.5"><span style="color:#575450">•</span><span style="color:#8A8580"><strong style="color:#ECE9E0;font-weight:500">Greedy colouring is not optimal.</strong> Repeated-MIS spent 5 channels on the worked 26-tower instance where 4 suffice. Minimum colouring is its own, harder problem — an exact ILP runs alongside.</span></div>
+    <div style="display:flex;gap:20px;font-size:27px;line-height:1.5"><span style="color:#575450">•</span><span style="color:#8A8580"><strong style="color:#ECE9E0;font-weight:500">No quantum advantage claimed.</strong> CBC solves a 100-node MIS in milliseconds. The demo's value: the constraint is not encoded but physical — the blockade circles are the interference circles.</span></div>
+  </div>
+</section>
+
+</x-dc>
+</body>
+</html>

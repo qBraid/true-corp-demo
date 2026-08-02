@@ -8,3 +8,8 @@ numpy>=1.24
 scipy>=1.10
 pandas>=2.0
 matplotlib>=3.7
+Pillow>=10.0            # asset handling for slide/map exports
+ipywidgets>=8.1         # interactive result widgets
+anywidget>=0.11         # backs Plotly FigureWidget
+plotly>=6.0             # dark-themed result widgets + deck figures
+kaleido                 # static PNG export (dev / slide rendering)
