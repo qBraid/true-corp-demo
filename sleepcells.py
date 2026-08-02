@@ -702,6 +702,44 @@ def verify_independent_set(G: nx.Graph, S: Iterable[int]) -> bool:
     return True
 
 
+def repair_to_independent_set(G: nx.Graph, S: Iterable[int]) -> list[int]:
+    """Make S a valid independent set by greedily dropping the vertex incident to the
+    most blockade violations. Used ONLY as a safety net if a hardware shot broke the
+    blockade (two adjacent atoms both excited) and no clean shot exists."""
+    from collections import Counter
+    S = set(S)
+    while True:
+        bad = list(G.subgraph(S).edges())
+        if not bad:
+            return sorted(S)
+        c: Counter = Counter()
+        for u, v in bad:
+            c[u] += 1
+            c[v] += 1
+        worst = max(c, key=lambda x: (c[x], G.degree(x)))
+        S.discard(worst)
+
+
+def best_valid_set(selections, G: nx.Graph):
+    """Post-select decoded per-shot selections to VALID independent sets (the coverage
+    certificate MUST hold) and return the largest, with the blockade-violation count.
+
+    On real hardware the Rydberg blockade is imperfect: some shots contain two adjacent
+    excited atoms, i.e. NOT an independent set (this is why a raw shot can report a set
+    larger than the exact optimum). We reject those shots and report the best clean set.
+
+    Returns (best_valid_set, n_violations, n_valid_shots). If no shot was clean, repairs
+    the largest raw shot as a last resort and reports n_valid_shots == 0.
+    """
+    valid = [list(s) for s in selections if verify_independent_set(G, s)]
+    n_violations = len(selections) - len(valid)
+    if valid:
+        return max(valid, key=len), n_violations, len(valid)
+    if not selections:
+        return [], 0, 0
+    return repair_to_independent_set(G, max(selections, key=len)), n_violations, 0
+
+
 # --- Money-model constants. True's OWN published numbers where possible; the
 #     two physical levers (SITE_POWER_KW, LOW_TRAFFIC_HOURS) are flagged as
 #     assumptions in the notebook's assumptions block. ---

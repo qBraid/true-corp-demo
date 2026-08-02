@@ -102,7 +102,7 @@ except Exception as e:
 # 1 · SUBMIT LIVE JOB
 # ==========================================================================
 md(r"""
-## 1 · Submit the live job to Boston
+## 1 · Submit the live job to the Quantum Device
 """)
 
 code(r"""
@@ -361,8 +361,10 @@ try:
         print(f"live task {live_task_id} status: {status}")
         if "COMPLETED" in status.upper() or "DONE" in status.upper():
             r = live_job.result()
-            collected = [sc.Shot(m.pre_sequence, m.post_sequence) for m in r.measurements]
-            coll_source = "LIVE QPU (Aquila, Boston)"
+            # qBraid Result: per-shot AHS data lives on r.data.measurements
+            # (r.measurements is a deprecated bound method -> not iterable).
+            collected = [sc.Shot(m.pre_sequence, m.post_sequence) for m in r.data.measurements]
+            coll_source = "LIVE QPU (Quantum Device)"
         else:
             print("still queued — falling back to the committed result (no exception).")
     else:
@@ -375,12 +377,18 @@ if collected is None:
     collected = rr["shots"]; coll_source = f"{rr['source']} (committed)"
 
 sel_c, ret_c, tot_c, _ = sc.decode_shots(collected, live_inst["n_atoms"])
-best_c = max(sel_c, key=len)
+# Post-select to VALID independent sets. Real hardware's Rydberg blockade is imperfect:
+# some shots excite two adjacent atoms (NOT a valid sleep set — that is why a raw shot can
+# beat the exact optimum). We reject those so the coverage certificate always holds.
+best_c, viol_c, nvalid_c = sc.best_valid_set(sel_c, live_G)
 is_qpu = coll_source.startswith("LIVE QPU")
-label = "Aquila (Boston)" if is_qpu else "the committed result"
+label = "the Quantum Device" if is_qpu else "the committed result"
 print(f"\nsource           : {coll_source}")
 print(f"best sleep set   : |S| = {len(best_c)}  (Cell-7 simulator got {len(sim_best)}, "
       f"exact optimum {exact_live})")
+if is_qpu:
+    print(f"blockade check   : {viol_c}/{ret_c} shots had adjacent excitations, rejected "
+          f"(imperfect Rydberg blockade); {nvalid_c} valid sleep sets kept")
 print(f"coverage check   : {'COVERAGE VERIFIED' if sc.verify_independent_set(live_G, best_c) else 'FAILED'}")
 agree = "AGREE" if len(best_c) == len(sim_best) else f"differ by {abs(len(best_c)-len(sim_best))}"
 print(f"agreement        : {label} and the live-cell simulator {agree} on the sleep-set size")
