@@ -114,7 +114,7 @@ def local_ahs_shots(reg: sc.Register, shots=1000, steps=100, seed=None):
 # PHENOMENOLOGICAL 150-atom stand-in (documented; clearly NOT a quantum sim)
 # --------------------------------------------------------------------------
 def phenomenological_shots(G, n_atoms, shots=1000, p_empty=0.02,
-                           drop_prob=0.09, rand_frac=0.35, seed=0):
+                           drop_prob=0.16, rand_frac=0.5, seed=0):
     """Draw Aquila-like shots for a size the local simulator cannot reach.
 
     Model per shot (documented, phenomenological — this is NOT solving the

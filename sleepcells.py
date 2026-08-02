@@ -77,6 +77,10 @@ THAILAND_MCC = 520
 # TrueMove H, 25 = True Corp legacy. Competitors excluded: AIS = {01,03,23}, NT = {02,15,47}.
 TRUE_GROUP_MNCS = (0, 4, 5, 18, 25, 99)
 
+# Only the BROADBAND layers are sleep candidates. GSM is deliberately left OUT: it stays
+# awake as the always-on coverage floor, so sleeping LTE/UMTS never drops a user to 2G speeds.
+SLEEP_CANDIDATE_RADIOS = ("LTE", "UMTS", "NR")
+
 
 def load_cells(csv_path: str) -> pd.DataFrame:
     """Load an OpenCelliD-schema CSV.
@@ -99,13 +103,19 @@ def filter_cells(
     mcc: int = THAILAND_MCC,
     mncs: Iterable[int] = TRUE_GROUP_MNCS,
     bbox: tuple[float, float, float, float] | None = None,
+    radios: Iterable[str] | None = SLEEP_CANDIDATE_RADIOS,
 ) -> pd.DataFrame:
-    """Filter to one operator group inside a lat/lon bounding box.
+    """Filter to one operator group (and, by default, the broadband sleep-candidate
+    radios) inside a lat/lon bounding box.
 
-    bbox = (min_lat, max_lat, min_lon, max_lon).
+    bbox   = (min_lat, max_lat, min_lon, max_lon).
+    radios = radio generations kept; default excludes GSM so 2G stays awake as the
+             coverage floor. Pass None to keep all radios.
     """
     m = df["mcc"] == mcc
     m &= df["net"].isin(list(mncs))
+    if radios is not None:
+        m &= df["radio"].isin(list(radios))
     if bbox is not None:
         min_lat, max_lat, min_lon, max_lon = bbox
         m &= df["lat"].between(min_lat, max_lat)
@@ -692,6 +702,44 @@ def verify_independent_set(G: nx.Graph, S: Iterable[int]) -> bool:
     return True
 
 
+def repair_to_independent_set(G: nx.Graph, S: Iterable[int]) -> list[int]:
+    """Make S a valid independent set by greedily dropping the vertex incident to the
+    most blockade violations. Used ONLY as a safety net if a hardware shot broke the
+    blockade (two adjacent atoms both excited) and no clean shot exists."""
+    from collections import Counter
+    S = set(S)
+    while True:
+        bad = list(G.subgraph(S).edges())
+        if not bad:
+            return sorted(S)
+        c: Counter = Counter()
+        for u, v in bad:
+            c[u] += 1
+            c[v] += 1
+        worst = max(c, key=lambda x: (c[x], G.degree(x)))
+        S.discard(worst)
+
+
+def best_valid_set(selections, G: nx.Graph):
+    """Post-select decoded per-shot selections to VALID independent sets (the coverage
+    certificate MUST hold) and return the largest, with the blockade-violation count.
+
+    On real hardware the Rydberg blockade is imperfect: some shots contain two adjacent
+    excited atoms, i.e. NOT an independent set (this is why a raw shot can report a set
+    larger than the exact optimum). We reject those shots and report the best clean set.
+
+    Returns (best_valid_set, n_violations, n_valid_shots). If no shot was clean, repairs
+    the largest raw shot as a last resort and reports n_valid_shots == 0.
+    """
+    valid = [list(s) for s in selections if verify_independent_set(G, s)]
+    n_violations = len(selections) - len(valid)
+    if valid:
+        return max(valid, key=len), n_violations, len(valid)
+    if not selections:
+        return [], 0, 0
+    return repair_to_independent_set(G, max(selections, key=len)), n_violations, 0
+
+
 # --- Money-model constants. True's OWN published numbers where possible; the
 #     two physical levers (SITE_POWER_KW, LOW_TRAFFIC_HOURS) are flagged as
 #     assumptions in the notebook's assumptions block. ---
@@ -938,6 +986,8 @@ def print_assumptions() -> None:
     print("  • Coverage is modelled as UNIFORM-RADIUS disks. Real radii vary by band, tilt, class.")
     print("  • Positions are a REAL OpenCelliD extract (MCC 520, True-group MNCs) — crowdsourced")
     print("    estimated centroids, NOT surveyed tower locations (data © OpenCelliD, CC-BY-SA 4.0).")
+    print("  • Only LTE/UMTS cells are sleep candidates; GSM stays awake as the always-on 2G")
+    print("    coverage floor, so sleeping broadband never drops a user to 2G speeds.")
     print("  • NO quantum advantage is claimed anywhere. On these sizes, classical wins.")
     print("=" * 74)
 

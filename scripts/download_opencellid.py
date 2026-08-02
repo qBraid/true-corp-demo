@@ -46,20 +46,24 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def resolve_token(cli_token: str | None) -> str:
-    """Find the OpenCelliD token from --token, the OPEN_CELLID_TOKEN env var, or a
-    local .env file (never echoed). The .env file is gitignored."""
+    """Find the OpenCelliD token from --token, then the local .env FILE (the
+    user-managed source of truth — read fresh every call), then the environment.
+    The .env file wins over a possibly-stale OPEN_CELLID_TOKEN in the environment.
+    The token is never echoed; .env is gitignored."""
     if cli_token:
         return cli_token
-    if os.environ.get("OPEN_CELLID_TOKEN"):
-        return os.environ["OPEN_CELLID_TOKEN"]
     env_path = os.path.join(HERE, ".env")
     if os.path.exists(env_path):
         for line in open(env_path):
             line = line.strip()
             if line.startswith("OPEN_CELLID_TOKEN") and "=" in line:
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("No OpenCelliD token found. Set OPEN_CELLID_TOKEN (env or .env) "
-                     "or pass --token.")
+                val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if val:
+                    return val
+    if os.environ.get("OPEN_CELLID_TOKEN"):
+        return os.environ["OPEN_CELLID_TOKEN"]
+    raise SystemExit("No OpenCelliD token found. Set OPEN_CELLID_TOKEN in .env "
+                     "or the environment, or pass --token.")
 
 # True-group MNCs under Thailand MCC 520 (competitors AIS/NT excluded).
 TRUE_GROUP_MNCS = (0, 4, 5, 18, 25, 99)
@@ -79,6 +83,9 @@ def download_mcc_csv(token: str) -> pd.DataFrame:
     req = urllib.request.Request(url, headers={"User-Agent": "true-corp-demo/1.0 (quantum demo)"})
     with urllib.request.urlopen(req, timeout=300) as resp:
         raw = resp.read()
+    if raw[:1] == b"{":            # JSON body instead of gzip => an error (e.g. RATE_LIMITED)
+        import json
+        raise RuntimeError(f"OpenCelliD bulk download unavailable: {json.loads(raw.decode('utf-8','replace'))}")
     with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
         df = pd.read_csv(gz, names=COLUMNS, header=None)
     # Some exports include a header row; drop it if present.
@@ -101,22 +108,86 @@ def filter_true_watthana(df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[m, COLUMNS].reset_index(drop=True)
 
 
+# --------------------------------------------------------------------------
+# getInArea fallback — used only if the bulk MCC download is rate-limited.
+#
+# IMPORTANT: each getInArea call returns at most 50 cells; you MUST paginate with
+# `offset` until a page comes back with < 50, and the query box must stay under
+# 4,000,000 m². The first version of this fetch capped pagination at offset 1000,
+# which silently truncated dense tiles and produced horizontal "bands" of missing
+# towers. Here we tile FINELY (each tile has few enough cells to page fully) and
+# paginate with no artificial cap.
+# --------------------------------------------------------------------------
+_AREA_URL = ("https://opencellid.org/cell/getInArea?key={token}&BBOX={bbox}"
+             "&mcc=520&format=json&limit=50&offset={offset}")
+_UA = {"User-Agent": "true-corp-demo/1.0 (quantum demo)"}
+
+
+def getinarea_watthana(token: str, tile_m: float = 1100.0) -> pd.DataFrame:
+    import json
+    import math
+    min_lat, max_lat, min_lon, max_lon = BBOX
+    mlat = 111_000.0
+    mlon = 111_000.0 * math.cos(math.radians((min_lat + max_lat) / 2))
+    nlat = math.ceil((max_lat - min_lat) * mlat / tile_m)
+    nlon = math.ceil((max_lon - min_lon) * mlon / tile_m)
+    dlat = (max_lat - min_lat) / nlat
+    dlon = (max_lon - min_lon) / nlon
+    print(f"getInArea: {nlat}x{nlon} tiles (~{tile_m:.0f} m each), full pagination",
+          file=sys.stderr)
+
+    seen = {}
+    for i in range(nlat):
+        for j in range(nlon):
+            la0, la1 = min_lat + i * dlat, min_lat + (i + 1) * dlat
+            lo0, lo1 = min_lon + j * dlon, min_lon + (j + 1) * dlon
+            off = 0
+            while True:                                   # paginate until a short page
+                url = _AREA_URL.format(token=token, bbox=f"{la0},{lo0},{la1},{lo1}", offset=off)
+                resp = urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=60)
+                payload = json.loads(resp.read().decode())
+                cells = payload.get("cells", [])
+                if "error" in payload:
+                    raise SystemExit(f"getInArea error: {payload}")
+                for c in cells:
+                    seen[(c["mnc"], c["lac"], c["cellid"])] = c
+                if len(cells) < 50 or off > 20000:        # short page => tile exhausted
+                    break
+                off += 50
+    rows = [dict(radio=c.get("radio", "") or "", mcc=c["mcc"], net=c["mnc"], area=c["lac"],
+                 cell=c["cellid"], unit=0, lon=c["lon"], lat=c["lat"], range=c.get("range", 0),
+                 samples=c.get("samples", 0), changeable=c.get("changeable", 1), created=0,
+                 updated=0, averageSignal=c.get("averageSignalStrength", 0))
+            for c in seen.values()]
+    return pd.DataFrame(rows)[COLUMNS]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--token", default=None,
                     help="OpenCelliD API token (default: OPEN_CELLID_TOKEN env / .env)")
-    ap.add_argument("--out", default="data/watthana_cells_real.csv",
-                    help="output CSV path")
+    ap.add_argument("--out", default="data/watthana_cells_real.csv", help="output CSV path")
+    ap.add_argument("--method", choices=["bulk", "area", "auto"], default="auto",
+                    help="bulk = complete MCC download (best); area = tiled getInArea; "
+                         "auto = bulk, fall back to area if rate-limited")
     args = ap.parse_args()
+    token = resolve_token(args.token)
 
-    df = download_mcc_csv(resolve_token(args.token))
-    print(f"MCC 520 rows: {len(df):,}", file=sys.stderr)
-    out = filter_true_watthana(df)
-    out.to_csv(args.out, index=False)
-    print(f"Wrote {len(out):,} True-group cells in Watthana -> {args.out}")
-    print(f"  MNC counts: {dict(out['net'].value_counts())}")
-    print(f"  radio counts: {dict(out['radio'].value_counts())}")
-    print("Point the notebook's DATA_CSV at this file to use real positions.")
+    df = None
+    if args.method in ("bulk", "auto"):
+        try:
+            df = filter_true_watthana(download_mcc_csv(token))
+        except Exception as e:
+            print(f"bulk download unavailable ({repr(e)[:80]})", file=sys.stderr)
+            if args.method == "bulk":
+                raise
+    if df is None:
+        df = getinarea_watthana(token)                    # complete, finely-tiled fallback
+
+    df.to_csv(args.out, index=False)
+    print(f"Wrote {len(df):,} True-group cells in Watthana -> {args.out}")
+    print(f"  MNC counts: {dict(df['net'].value_counts())}")
+    print(f"  radio counts: {dict(df['radio'].value_counts())}")
 
 
 if __name__ == "__main__":

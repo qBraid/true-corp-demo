@@ -1,0 +1,5 @@
+{
+  "task_id": "aws:quera:qpu:aquila-ae17-qjob-6a6f501129289824865a8226",
+  "shots": 1000,
+  "instance": "sukhumvit_90.json"
+}
