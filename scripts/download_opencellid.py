@@ -46,20 +46,24 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def resolve_token(cli_token: str | None) -> str:
-    """Find the OpenCelliD token from --token, the OPEN_CELLID_TOKEN env var, or a
-    local .env file (never echoed). The .env file is gitignored."""
+    """Find the OpenCelliD token from --token, then the local .env FILE (the
+    user-managed source of truth — read fresh every call), then the environment.
+    The .env file wins over a possibly-stale OPEN_CELLID_TOKEN in the environment.
+    The token is never echoed; .env is gitignored."""
     if cli_token:
         return cli_token
-    if os.environ.get("OPEN_CELLID_TOKEN"):
-        return os.environ["OPEN_CELLID_TOKEN"]
     env_path = os.path.join(HERE, ".env")
     if os.path.exists(env_path):
         for line in open(env_path):
             line = line.strip()
             if line.startswith("OPEN_CELLID_TOKEN") and "=" in line:
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("No OpenCelliD token found. Set OPEN_CELLID_TOKEN (env or .env) "
-                     "or pass --token.")
+                val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if val:
+                    return val
+    if os.environ.get("OPEN_CELLID_TOKEN"):
+        return os.environ["OPEN_CELLID_TOKEN"]
+    raise SystemExit("No OpenCelliD token found. Set OPEN_CELLID_TOKEN in .env "
+                     "or the environment, or pass --token.")
 
 # True-group MNCs under Thailand MCC 520 (competitors AIS/NT excluded).
 TRUE_GROUP_MNCS = (0, 4, 5, 18, 25, 99)
