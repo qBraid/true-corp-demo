@@ -44,14 +44,30 @@ import pandas as pd
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # --- what we collect -------------------------------------------------------
-MCC = 520                                             # Thailand
-TRUE_GROUP_MNCS = (0, 4, 5, 18, 25, 99)               # True / dtac families
-BBOX = (13.710, 13.752, 100.550, 100.600)             # (min_lat, max_lat, min_lon, max_lon)
-COLUMNS = ["radio", "mcc", "net", "area", "cell", "unit", "lon", "lat",
-           "range", "samples", "changeable", "created", "updated", "averageSignal"]
+MCC = 520  # Thailand
+TRUE_GROUP_MNCS = (0, 4, 5, 18, 25, 99)  # True / dtac families
+BBOX = (13.710, 13.752, 100.550, 100.600)  # (min_lat, max_lat, min_lon, max_lon)
+COLUMNS = [
+    "radio",
+    "mcc",
+    "net",
+    "area",
+    "cell",
+    "unit",
+    "lon",
+    "lat",
+    "range",
+    "samples",
+    "changeable",
+    "created",
+    "updated",
+    "averageSignal",
+]
 
-_AREA_URL = ("https://opencellid.org/cell/getInArea?key={token}&BBOX={bbox}"
-             "&mcc={mcc}&format=json&limit=50&offset={offset}")
+_AREA_URL = (
+    "https://opencellid.org/cell/getInArea?key={token}&BBOX={bbox}"
+    "&mcc={mcc}&format=json&limit=50&offset={offset}"
+)
 _UA = {"User-Agent": "true-corp-demo/1.0 (quantum education demo)"}
 
 
@@ -99,24 +115,43 @@ def collect(token: str, tile_m: float = 1000.0) -> pd.DataFrame:
                 payload = _fetch(token, la0, lo0, la1, lo1, off)
                 calls += 1
                 if "error" in payload:
-                    raise SystemExit(f"\nOpenCelliD error after {calls} calls: {payload}\n"
-                                     "Likely rate-limited (per-IP). Retry later / another network.")
+                    raise SystemExit(
+                        f"\nOpenCelliD error after {calls} calls: {payload}\n"
+                        "Likely rate-limited (per-IP). Retry later / another network."
+                    )
                 cells = payload.get("cells", [])
                 for c in cells:
                     seen[(c["mnc"], c["lac"], c["cellid"])] = c
                 got += len(cells)
-                if len(cells) < 50:                    # short page => tile exhausted
+                if len(cells) < 50:  # short page => tile exhausted
                     break
                 off += 50
-            print(f"  tile [{i+1:>2}/{nlat},{j+1:>2}/{nlon}] lat {la0:.4f}-{la1:.4f}: "
-                  f"{got:4d} cells (dedup total {len(seen)})", flush=True)
+            print(
+                f"  tile [{i+1:>2}/{nlat},{j+1:>2}/{nlon}] lat {la0:.4f}-{la1:.4f}: "
+                f"{got:4d} cells (dedup total {len(seen)})",
+                flush=True,
+            )
     print(f"getInArea calls used: {calls}")
 
-    rows = [dict(radio=c.get("radio", "") or "", mcc=c["mcc"], net=c["mnc"], area=c["lac"],
-                 cell=c["cellid"], unit=0, lon=c["lon"], lat=c["lat"], range=c.get("range", 0),
-                 samples=c.get("samples", 0), changeable=c.get("changeable", 1), created=0,
-                 updated=0, averageSignal=c.get("averageSignalStrength", 0))
-            for c in seen.values()]
+    rows = [
+        dict(
+            radio=c.get("radio", "") or "",
+            mcc=c["mcc"],
+            net=c["mnc"],
+            area=c["lac"],
+            cell=c["cellid"],
+            unit=0,
+            lon=c["lon"],
+            lat=c["lat"],
+            range=c.get("range", 0),
+            samples=c.get("samples", 0),
+            changeable=c.get("changeable", 1),
+            created=0,
+            updated=0,
+            averageSignal=c.get("averageSignalStrength", 0),
+        )
+        for c in seen.values()
+    ]
     return pd.DataFrame(rows)[COLUMNS]
 
 
@@ -138,14 +173,22 @@ def completeness_report(df: pd.DataFrame) -> None:
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--token", default=None, help="OpenCelliD token (default: .env / env)")
     ap.add_argument("--out", default=os.path.join(HERE, "data", "watthana_cells_real.csv"))
-    ap.add_argument("--tile-m", type=float, default=1000.0,
-                    help="tile side in metres (smaller = safer against truncation)")
-    ap.add_argument("--true-only", action="store_true",
-                    help="save only True-group MNCs (default saves all MCC 520)")
+    ap.add_argument(
+        "--tile-m",
+        type=float,
+        default=1000.0,
+        help="tile side in metres (smaller = safer against truncation)",
+    )
+    ap.add_argument(
+        "--true-only",
+        action="store_true",
+        help="save only True-group MNCs (default saves all MCC 520)",
+    )
     args = ap.parse_args()
 
     t0 = time.time()
@@ -156,8 +199,10 @@ def main():
     df.to_csv(args.out, index=False)
     completeness_report(df)
     print(f"\nwrote {len(df):,} rows -> {args.out}   ({time.time()-t0:.0f}s)")
-    print("Next: python scripts/prerun_experiments.py && python scripts/fetch_basemap.py "
-          "&& python scripts/build_notebook.py")
+    print(
+        "Next: python scripts/prerun_experiments.py && python scripts/fetch_basemap.py "
+        "&& python scripts/build_notebook.py"
+    )
 
 
 if __name__ == "__main__":

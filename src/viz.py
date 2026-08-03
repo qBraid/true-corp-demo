@@ -1,8 +1,8 @@
 """
-sleepviz.py — presentation figures for "Which cells can sleep tonight?"
+viz.py — presentation figures for "Which towers can share a channel?"
 
 All matplotlib lives here so the notebook cells stay thin: build data with
-`sleepcells`, then hand it to one high-level figure function. Two layers:
+`towers`, then hand it to one high-level figure function. Two layers:
 
   low-level   draw onto a caller-supplied Axes   (plot_sites, plot_register,
               shot_histogram, wallclock)          — composable, return the Axes
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import numpy as np
 
-import sleepcells as sc
+import towers as tw
 
 
 # ---------------------------------------------------------------------------
@@ -30,12 +30,12 @@ import sleepcells as sc
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class Style:
-    true_red: str = "#e4002b"      # asleep / brand accent
-    ink: str = "#1a1a1a"           # text, classical optimum
-    awake: str = "#c9ccd1"         # awake sites
-    edge: str = "#e6a9b4"          # coverage edges
-    quantum: str = "#00843d"       # quantum best / future target
-    classical: str = "#1a4fd6"     # classical curve
+    true_red: str = "#e4002b"  # selected set / brand accent
+    ink: str = "#1a1a1a"  # text, classical optimum
+    unsel: str = "#c9ccd1"  # sites not in the set
+    edge: str = "#e6a9b4"  # coverage edges
+    quantum: str = "#00843d"  # quantum best / future target
+    classical: str = "#1a4fd6"  # classical curve
     field_box: str = "#bbbbbb"
     note: str = "#8a8f96"
 
@@ -45,11 +45,18 @@ STYLE = Style()
 
 def apply_style() -> None:
     """Set the notebook-wide matplotlib defaults. Call once in setup."""
-    plt.rcParams.update({
-        "figure.dpi": 110, "font.size": 11, "axes.edgecolor": "#cccccc",
-        "axes.grid": False, "axes.spines.top": False, "axes.spines.right": False,
-        "figure.facecolor": "white", "axes.facecolor": "white",
-    })
+    plt.rcParams.update(
+        {
+            "figure.dpi": 110,
+            "font.size": 11,
+            "axes.edgecolor": "#cccccc",
+            "axes.grid": False,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "figure.facecolor": "white",
+            "axes.facecolor": "white",
+        }
+    )
 
 
 def _geo_aspect(lat) -> float:
@@ -62,66 +69,103 @@ def _geo_aspect(lat) -> float:
 # ---------------------------------------------------------------------------
 def _draw_edges(ax, xs, ys, edges):
     for i, j in edges:
-        ax.plot([xs[i], xs[j]], [ys[i], ys[j]], "-", color=STYLE.edge,
-                lw=0.6, alpha=0.5, zorder=1)
+        ax.plot([xs[i], xs[j]], [ys[i], ys[j]], "-", color=STYLE.edge, lw=0.6, alpha=0.5, zorder=1)
 
 
 def _draw_nodes(ax, xs, ys, selected, s):
     sel = set(selected or [])
-    awake = [k for k in range(len(xs)) if k not in sel]
-    ax.scatter([xs[k] for k in awake], [ys[k] for k in awake], s=s, c=STYLE.awake,
-               edgecolors="white", linewidths=0.5, zorder=2, label="awake")
+    rest = [k for k in range(len(xs)) if k not in sel]
+    ax.scatter(
+        [xs[k] for k in rest],
+        [ys[k] for k in rest],
+        s=s,
+        c=STYLE.unsel,
+        edgecolors="white",
+        linewidths=0.5,
+        zorder=2,
+        label="other",
+    )
     if sel:
-        ax.scatter([xs[k] for k in sel], [ys[k] for k in sel], s=s + 18, c=STYLE.true_red,
-                   edgecolors="white", linewidths=0.6, zorder=3, label="asleep")
+        ax.scatter(
+            [xs[k] for k in sel],
+            [ys[k] for k in sel],
+            s=s + 18,
+            c=STYLE.true_red,
+            edgecolors="white",
+            linewidths=0.6,
+            zorder=3,
+            label="in set",
+        )
 
 
-def plot_sites(ax, lon, lat, selected=None, edges=None, show_edges=True,
-               title="", s=42, legend=True):
-    """Scatter sites on a lon/lat map; `selected` (asleep) in red, edges faint."""
-    lon = np.asarray(lon, float); lat = np.asarray(lat, float)
+def plot_sites(
+    ax, lon, lat, selected=None, edges=None, show_edges=True, title="", s=42, legend=True
+):
+    """Scatter sites on a lon/lat map; `selected` (the independent set) in red, edges faint."""
+    lon = np.asarray(lon, float)
+    lat = np.asarray(lat, float)
     if edges and show_edges:
         _draw_edges(ax, lon, lat, edges)
     _draw_nodes(ax, lon, lat, selected, s)
     ax.set_title(title, fontsize=12, color=STYLE.ink, loc="left")
-    ax.set_xlabel("longitude"); ax.set_ylabel("latitude")
+    ax.set_xlabel("longitude")
+    ax.set_ylabel("latitude")
     ax.set_aspect(_geo_aspect(lat))
     if legend and selected:
         ax.legend(loc="upper right", frameon=False, fontsize=9)
     return ax
 
 
-def plot_register(ax, coords_um, edges=None, selected=None, title="", s=45,
-                  show_field=False):
+def plot_register(ax, coords_um, edges=None, selected=None, title="", s=45, show_field=False):
     """Scatter the atom register in micrometres; optionally show the field box."""
     x, y = np.asarray(coords_um)[:, 0], np.asarray(coords_um)[:, 1]
     if edges:
         _draw_edges(ax, x, y, edges)
     _draw_nodes(ax, x, y, selected, s)
-    if show_field:                                    # full field box (atoms fill it)
+    if show_field:  # full field box (atoms fill it)
         import matplotlib.patches as mpatches
-        ax.set_xlim(-4, sc.FIELD_UM + 4); ax.set_ylim(-4, sc.FIELD_UM + 4)
-        ax.add_patch(mpatches.Rectangle((0, 0), sc.FIELD_UM, sc.FIELD_UM, fill=False,
-                     ec=STYLE.field_box, ls="--", lw=1.0))
-    else:                                             # auto-scale so atoms fill the panel
+
+        ax.set_xlim(-4, tw.FIELD_UM + 4)
+        ax.set_ylim(-4, tw.FIELD_UM + 4)
+        ax.add_patch(
+            mpatches.Rectangle(
+                (0, 0), tw.FIELD_UM, tw.FIELD_UM, fill=False, ec=STYLE.field_box, ls="--", lw=1.0
+            )
+        )
+    else:  # auto-scale so atoms fill the panel
         pad = 0.12 * max(np.ptp(x), np.ptp(y)) + 1.5
-        ax.set_xlim(x.min() - pad, x.max() + pad); ax.set_ylim(y.min() - pad, y.max() + pad)
-        ax.text(0.02, 0.98, f"atoms span {max(np.ptp(x), np.ptp(y)):.0f} µm "
-                f"of the {sc.FIELD_UM:.0f} µm field", transform=ax.transAxes,
-                va="top", fontsize=8.5, color=STYLE.note)
+        ax.set_xlim(x.min() - pad, x.max() + pad)
+        ax.set_ylim(y.min() - pad, y.max() + pad)
+        ax.text(
+            0.02,
+            0.98,
+            f"atoms span {max(np.ptp(x), np.ptp(y)):.0f} µm " f"of the {tw.FIELD_UM:.0f} µm field",
+            transform=ax.transAxes,
+            va="top",
+            fontsize=8.5,
+            color=STYLE.note,
+        )
     ax.set_title(title, fontsize=12, color=STYLE.ink, loc="left")
-    ax.set_xlabel("x (µm)"); ax.set_ylabel("y (µm)"); ax.set_aspect("equal")
+    ax.set_xlabel("x (µm)")
+    ax.set_ylabel("y (µm)")
+    ax.set_aspect("equal")
     return ax
 
 
 def shot_histogram(ax, sizes, optimum, best, title=""):
     """Independent-set size distribution across shots, optimum & best marked."""
     sizes = list(sizes)
-    ax.hist(sizes, bins=range(min(sizes), max(sizes) + 2), color=STYLE.true_red,
-            alpha=0.85, edgecolor="white")
+    ax.hist(
+        sizes,
+        bins=range(min(sizes), max(sizes) + 2),
+        color=STYLE.true_red,
+        alpha=0.85,
+        edgecolor="white",
+    )
     ax.axvline(optimum, color=STYLE.ink, ls="--", lw=1.6, label=f"classical optimum = {optimum}")
     ax.axvline(best, color=STYLE.quantum, ls="-", lw=1.6, label=f"quantum best = {best}")
-    ax.set_xlabel("independent-set size |S| per shot"); ax.set_ylabel("shots")
+    ax.set_xlabel("independent-set size |S| per shot")
+    ax.set_ylabel("shots")
     ax.set_title(title, fontsize=12, color=STYLE.ink, loc="left")
     ax.legend(frameon=False, fontsize=9)
     return ax
@@ -129,57 +173,81 @@ def shot_histogram(ax, sizes, optimum, best, title=""):
 
 def wallclock(ax, scale_pts, aquila_today_s, future_s, title=""):
     """Classical exact-solve time (grows) vs Aquila's flat, shot-rate-limited line."""
-    ks = [p[0] for p in scale_pts]; ts = [p[1] for p in scale_pts]
+    ks = [p[0] for p in scale_pts]
+    ts = [p[1] for p in scale_pts]
     ax.semilogy(ks, ts, "o-", color=STYLE.classical, lw=2, label="classical exact (per instance)")
-    ax.axhline(aquila_today_s, color=STYLE.true_red, lw=2,
-               label=f"Aquila today ≈ {aquila_today_s:.0f} s  (1000 shots ÷ shot rate)")
+    ax.axhline(
+        aquila_today_s,
+        color=STYLE.true_red,
+        lw=2,
+        label=f"Aquila today ≈ {aquila_today_s:.0f} s  (1000 shots ÷ shot rate)",
+    )
     ax.axhline(future_s, color=STYLE.quantum, lw=2, ls="--", label="1000 atoms @ 1 kHz (target)")
     ax.set_ylim(1e-3, 1e3)
-    ax.set_xlabel("sites"); ax.set_ylabel("wall-clock per instance (s, log)")
+    ax.set_xlabel("sites")
+    ax.set_ylabel("wall-clock per instance (s, log)")
     ax.set_title(title, fontsize=12, color=STYLE.ink, loc="left")
     ax.legend(frameon=True, framealpha=0.9, edgecolor="none", fontsize=8.3, loc="lower right")
     return ax
 
 
 # ---------------------------------------------------------------------------
-# High-level: build a whole Figure from sleepcells objects
+# High-level: build a whole Figure from towers objects
 # ---------------------------------------------------------------------------
-def district_and_graph(atoms: "sc.Sites", sub: "sc.Sites", edges):
+def district_and_graph(atoms: "tw.Sites", sub: "tw.Sites", edges):
     """Two-panel WHAT figure: the whole district, and the densest coverage graph."""
     fig, ax = plt.subplots(1, 2, figsize=(14, 6.2))
-    plot_sites(ax[0], atoms.lon, atoms.lat, show_edges=False,
-               title=f"Watthana sites  ·  {atoms.n} atoms after merge")
-    plot_sites(ax[1], sub.lon, sub.lat, edges=edges,
-               title=f"Coverage graph  ·  densest {sub.n}, {len(edges)} edges, "
-                     f"avg degree {2*len(edges)/sub.n:.1f}")
+    plot_sites(
+        ax[0],
+        atoms.lon,
+        atoms.lat,
+        show_edges=False,
+        title=f"Watthana sites  ·  {atoms.n} atoms after merge",
+    )
+    plot_sites(
+        ax[1],
+        sub.lon,
+        sub.lat,
+        edges=edges,
+        title=f"Coverage graph  ·  densest {sub.n}, {len(edges)} edges, "
+        f"avg degree {2*len(edges)/sub.n:.1f}",
+    )
     fig.tight_layout()
-    plt.show()          # display once; low-level helpers stay composable
+    plt.show()  # display once; low-level helpers stay composable
 
 
-def three_panel(inst: dict, reg: "sc.Register", G):
+def three_panel(inst: dict, reg: "tw.Register", G):
     """Three-panel HOW figure: same shape as sites, as a graph, and as atoms."""
-    lon = inst["coords_lonlat"][:, 0]; lat = inst["coords_lonlat"][:, 1]
+    lon = inst["coords_lonlat"][:, 0]
+    lat = inst["coords_lonlat"][:, 1]
     edges = list(G.edges())
     fig, ax = plt.subplots(1, 3, figsize=(16, 5.4))
     plot_sites(ax[0], lon, lat, show_edges=False, legend=False, title="Sukhumvit sites")
     plot_sites(ax[1], lon, lat, edges=edges, legend=False, title="Coverage graph")
-    plot_register(ax[2], reg.coords_um, edges=edges,
-                  title=f"Atom register  ·  1 µm = {sc.SCALE_M_PER_UM:.0f} m")
+    plot_register(
+        ax[2],
+        reg.coords_um,
+        edges=edges,
+        title=f"Atom register  ·  1 µm = {tw.SCALE_M_PER_UM:.0f} m",
+    )
     fig.tight_layout()
-    plt.show()          # display once; low-level helpers stay composable
+    plt.show()  # display once; low-level helpers stay composable
 
 
 def payoff_map(inst: dict, selected, title=None):
-    """The money shot: the district with the measured sleeping cells highlighted."""
-    lon = inst["coords_lonlat"][:, 0]; lat = inst["coords_lonlat"][:, 1]
+    """The headline figure: the district with the measured co-channel group highlighted."""
+    lon = inst["coords_lonlat"][:, 0]
+    lat = inst["coords_lonlat"][:, 1]
     edges = list(inst["graph"].edges())
     if title is None:
-        title = (f"Which cells can sleep tonight — {len(selected)} of {inst['n_atoms']} "
-                 f"asleep, coverage verified")
+        title = (
+            f"Largest co-channel group: {len(selected)} of {inst['n_atoms']} "
+            f"towers share one channel, interference-free"
+        )
     fig, ax = plt.subplots(figsize=(7.4, 6.6))
     plot_sites(ax, lon, lat, selected=selected, edges=edges, title=title, s=48)
     fig.tight_layout()
-    plt.show()          # display once; low-level helpers stay composable
+    plt.show()  # display once; low-level helpers stay composable
 
 
 def scoreboard(sizes, optimum, best, scale_pts, aquila_today_s, future_s, retained=None):
@@ -187,18 +255,27 @@ def scoreboard(sizes, optimum, best, scale_pts, aquila_today_s, future_s, retain
     fig, ax = plt.subplots(1, 2, figsize=(14, 5))
     tag = f" ({retained} retained)" if retained is not None else ""
     shot_histogram(ax[0], sizes, optimum, best, title=f"Aquila shot distribution{tag}")
-    wallclock(ax[1], scale_pts, aquila_today_s, future_s,
-              title="Classical wins today — Aquila's flat line sits ABOVE it")
+    wallclock(
+        ax[1],
+        scale_pts,
+        aquila_today_s,
+        future_s,
+        title="Classical wins today — Aquila's flat line sits ABOVE it",
+    )
     fig.tight_layout()
-    plt.show()          # display once; low-level helpers stay composable
+    plt.show()  # display once; low-level helpers stay composable
 
 
 # ---------------------------------------------------------------------------
 # Real Sukhumvit basemap — geography -> towers -> atoms (dark)
 # ---------------------------------------------------------------------------
 # Sukhumvit Line BTS stations, for orientation.
-_BTS = [("Asok", 13.7370, 100.5604), ("Phrom Phong", 13.7304, 100.5697),
-        ("Thong Lo", 13.7242, 100.5786), ("Ekkamai", 13.7196, 100.5852)]
+_BTS = [
+    ("Asok", 13.7370, 100.5604),
+    ("Phrom Phong", 13.7304, 100.5697),
+    ("Thong Lo", 13.7242, 100.5786),
+    ("Ekkamai", 13.7196, 100.5852),
+]
 
 
 def _lonlat_to_px(lon, lat, ext, W, H):
@@ -223,6 +300,7 @@ def sukhumvit_map_layers(basemap_path, basemap_json, lon, lat, edges=None, show_
     """
     import json as _json
     import matplotlib.image as mpimg
+
     img = mpimg.imread(basemap_path)
     meta = _json.load(open(basemap_json))
     ext = (meta["west"], meta["east"], meta["south"], meta["north"])
@@ -231,32 +309,59 @@ def sukhumvit_map_layers(basemap_path, basemap_json, lon, lat, edges=None, show_
 
     fig, axes = plt.subplots(1, 3, figsize=(17, 5.8))
     fig.patch.set_facecolor("#0b0b0b")
-    titles = ["Sukhumvit / Watthana", "True cell sites (OpenCelliD)",
-              "On Aquila — atoms + coverage graph"]
+    titles = [
+        "Sukhumvit / Watthana",
+        "True cell sites (OpenCelliD)",
+        "On Aquila — atoms + coverage graph",
+    ]
     for i, ax in enumerate(axes):
         ax.imshow(img, interpolation="lanczos")
-        ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.axis("off")
         ax.set_title(titles[i], color="white", loc="left", fontsize=12.5, pad=8)
         if show_bts:
             for name, blat, blon in _BTS:
                 bx, by = _lonlat_to_px(blon, blat, ext, W, H)
                 bx, by = float(np.ravel(bx)[0]), float(np.ravel(by)[0])
-                ax.scatter(bx, by, s=26, facecolors="none", edgecolors="#6fd0e0",
-                           linewidths=1.1, zorder=4)
-                ax.text(bx + 6, by - 6, name, color="#9fe3ef",
-                        fontsize=7.5, zorder=4, alpha=0.9)
-        if i == 1:                                          # towers
-            ax.scatter(px, py, s=26, c=STYLE.true_red, edgecolors="white",
-                       linewidths=0.4, zorder=5, alpha=0.95)
-        if i == 2:                                          # atoms + coverage graph
+                ax.scatter(
+                    bx, by, s=26, facecolors="none", edgecolors="#6fd0e0", linewidths=1.1, zorder=4
+                )
+                ax.text(bx + 6, by - 6, name, color="#9fe3ef", fontsize=7.5, zorder=4, alpha=0.9)
+        if i == 1:  # towers
+            ax.scatter(
+                px,
+                py,
+                s=26,
+                c=STYLE.true_red,
+                edgecolors="white",
+                linewidths=0.4,
+                zorder=5,
+                alpha=0.95,
+            )
+        if i == 2:  # atoms + coverage graph
             if edges:
                 for a, b in edges:
-                    ax.plot([px[a], px[b]], [py[a], py[b]], color=STYLE.true_red,
-                            lw=0.5, alpha=0.35, zorder=3)
-            ax.scatter(px, py, s=150, c=STYLE.true_red, alpha=0.16, zorder=4)   # glow halo
-            ax.scatter(px, py, s=22, c="#ff5a76", edgecolors="white",
-                       linewidths=0.4, zorder=5)                                 # bright core
-    axes[0].text(0.01, 0.015, meta.get("attribution", "© OpenStreetMap © CARTO"),
-                 transform=axes[0].transAxes, color="#7a7a7a", fontsize=6.5, va="bottom")
+                    ax.plot(
+                        [px[a], px[b]],
+                        [py[a], py[b]],
+                        color=STYLE.true_red,
+                        lw=0.5,
+                        alpha=0.35,
+                        zorder=3,
+                    )
+            ax.scatter(px, py, s=150, c=STYLE.true_red, alpha=0.16, zorder=4)  # glow halo
+            ax.scatter(
+                px, py, s=22, c="#ff5a76", edgecolors="white", linewidths=0.4, zorder=5
+            )  # bright core
+    axes[0].text(
+        0.01,
+        0.015,
+        meta.get("attribution", "© OpenStreetMap © CARTO"),
+        transform=axes[0].transAxes,
+        color="#7a7a7a",
+        fontsize=6.5,
+        va="bottom",
+    )
     fig.tight_layout()
     plt.show()

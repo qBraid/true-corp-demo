@@ -23,8 +23,8 @@ import sys
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(HERE, "src"))
-import sleepcells as sc          # noqa: E402
-import channels as ch           # noqa: E402
+import towers as tw  # noqa: E402
+import channels as ch  # noqa: E402
 
 OUT = os.path.join(HERE, "results", "mock_mis_2colour.png")
 
@@ -37,6 +37,7 @@ def ring_instance(n=10):
     """n towers on a ring road; each conflicts with its two neighbours (even cycle
     when n is even -> 2-colourable)."""
     import networkx as nx
+
     G = nx.cycle_graph(n)
     pos = {i: (math.cos(2 * math.pi * i / n), math.sin(2 * math.pi * i / n)) for i in range(n)}
     return G, pos
@@ -46,6 +47,7 @@ def random_instance(n=12, radius=0.46, seed=1):
     """n towers at random positions; conflict edge when within `radius` (unit-disk)."""
     import networkx as nx
     import numpy as np
+
     rng = np.random.default_rng(seed)
     P = rng.random((n, 2))
     G = nx.Graph()
@@ -66,36 +68,73 @@ def mock_solve(G):
 
 def plot(G, pos, channels, channel_of, two_ok):
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(7.2, 7.2))
-    fig.patch.set_facecolor(BG); ax.set_facecolor(BG); ax.axis("off")
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+    ax.axis("off")
     for u, v in G.edges():
-        style = "-" if channel_of[u] != channel_of[v] else ":"      # dotted = still-conflicting
+        style = "-" if channel_of[u] != channel_of[v] else ":"  # dotted = still-conflicting
         col = "#3a3a40" if channel_of[u] != channel_of[v] else "#ff5a5a"
         ax.plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]], style, color=col, lw=1.6, zorder=1)
     for c, nodes in enumerate(channels):
-        xs = [pos[i][0] for i in nodes]; ys = [pos[i][1] for i in nodes]
-        ax.scatter(xs, ys, s=520, c=CH_COLORS[c % len(CH_COLORS)], edgecolors="white",
-                   linewidths=1.4, zorder=3, label=f"channel {c+1} ({len(nodes)})")
+        xs = [pos[i][0] for i in nodes]
+        ys = [pos[i][1] for i in nodes]
+        ax.scatter(
+            xs,
+            ys,
+            s=520,
+            c=CH_COLORS[c % len(CH_COLORS)],
+            edgecolors="white",
+            linewidths=1.4,
+            zorder=3,
+            label=f"channel {c+1} ({len(nodes)})",
+        )
     for i in G.nodes():
-        ax.text(pos[i][0], pos[i][1], str(i), color="#0a0a0b", ha="center", va="center",
-                fontsize=11, fontweight="bold", zorder=4)
-    title = (f"Mock MIS → {len(channels)} channel(s)"
-             + ("  ·  2 colours suffice ✓" if two_ok else "  ·  needs > 2 colours"))
+        ax.text(
+            pos[i][0],
+            pos[i][1],
+            str(i),
+            color="#0a0a0b",
+            ha="center",
+            va="center",
+            fontsize=11,
+            fontweight="bold",
+            zorder=4,
+        )
+    title = f"Mock MIS → {len(channels)} channel(s)" + (
+        "  ·  2 colours suffice ✓" if two_ok else "  ·  needs > 2 colours"
+    )
     ax.set_title(title, color=TEXT, fontsize=15, loc="center", pad=16)
-    leg = ax.legend(loc="upper center", bbox_to_anchor=(0.5, 0.02), ncol=len(channels),
-                    frameon=False, fontsize=11, labelcolor=TEXT)
-    ax.set_aspect("equal"); fig.tight_layout()
+    leg = ax.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=len(channels),
+        frameon=False,
+        fontsize=11,
+        labelcolor=TEXT,
+    )
+    ax.set_aspect("equal")
+    fig.tight_layout()
     fig.savefig(OUT, dpi=140, facecolor=BG, bbox_inches="tight")
     print(f"figure -> {OUT}")
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--n", type=int, default=10, help="number of towers on the ring")
-    ap.add_argument("--random", type=int, metavar="N", default=None,
-                    help="use a random unit-disk instance of N towers instead of the ring")
+    ap.add_argument(
+        "--random",
+        type=int,
+        metavar="N",
+        default=None,
+        help="use a random unit-disk instance of N towers instead of the ring",
+    )
     ap.add_argument("--seed", type=int, default=1)
     args = ap.parse_args()
 
@@ -111,7 +150,9 @@ def main():
     chi = ch.chromatic_number(G)
     two_ok = len(channels) == 2
 
-    print(f"instance     : {kind}  ({G.number_of_nodes()} nodes, {G.number_of_edges()} conflict edges)")
+    print(
+        f"instance     : {kind}  ({G.number_of_nodes()} nodes, {G.number_of_edges()} conflict edges)"
+    )
     print(f"mock MIS runs: {[len(c) for c in channels]}  -> {len(channels)} channel(s)")
     for p in prov:
         print(f"  channel {p['channel']+1}: {p['size']} towers  [{p['source']}]")

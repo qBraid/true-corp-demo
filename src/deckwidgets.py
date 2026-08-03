@@ -24,7 +24,7 @@ import html as _html
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)                       # repo root; this module lives in src/
+ROOT = os.path.dirname(HERE)  # repo root; this module lives in src/
 DECK = os.path.join(ROOT, "deck")
 BASEMAP = os.path.join(ROOT, "data", "sukhumvit_basemap.png")
 
@@ -47,25 +47,32 @@ def _basemap_uri(maxw: int = 1200) -> str:
     """Basemap as a data URI, downscaled so the mapping-stage iframe stays light."""
     from io import BytesIO
     from PIL import Image
+
     im = Image.open(BASEMAP).convert("RGB")
     if im.width > maxw:
         im = im.resize((maxw, round(im.height * maxw / im.width)))
-    buf = BytesIO(); im.save(buf, "JPEG", quality=82)
+    buf = BytesIO()
+    im.save(buf, "JPEG", quality=82)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def _iframe(body: str, scripts: list[str], height: int, three: bool = False,
-            radius: int = 12) -> "object":
+def _iframe(
+    body: str, scripts: list[str], height: int, three: bool = False, radius: int = 12
+) -> "object":
     from IPython.display import HTML
-    importmap = (f'<script type="importmap">{{"imports":{{"three":"{THREE_SRC}"}}}}</script>'
-                 if three else "")
+
+    importmap = (
+        f'<script type="importmap">{{"imports":{{"three":"{THREE_SRC}"}}}}</script>'
+        if three
+        else ""
+    )
     script_tags = "\n".join(f"<script>{s}</script>" for s in scripts)
     doc = (
         "<!doctype html><html><head><meta charset='utf-8'>"
         "<style>html,body{margin:0;height:100%;background:#0a0a0b;overflow:hidden}</style>"
         f"{importmap}</head><body>{body}{script_tags}</body></html>"
     )
-    srcdoc = _html.escape(doc, quote=True)     # the browser HTML-decodes srcdoc back to the real doc
+    srcdoc = _html.escape(doc, quote=True)  # the browser HTML-decodes srcdoc back to the real doc
     return HTML(
         f'<iframe srcdoc="{srcdoc}" loading="lazy" '
         f'style="width:100%;height:{height}px;border:0;border-radius:{radius}px;'
@@ -77,24 +84,33 @@ def _iframe(body: str, scripts: list[str], height: int, three: bool = False,
 def graph_stage(mode: str = "coloring", height: int = 540):
     """Canvas-2D conflict-graph animation. mode='coloring' (repeated MIS painting the
     graph in channel colours) or 'mis' (one MIS resolves to channel 1). Fully offline."""
-    body = (f'<graph-stage mode="{mode}" bare="1" '
-            f'style="display:block;width:100%;height:100%"></graph-stage>')
+    body = (
+        f'<graph-stage mode="{mode}" bare="1" '
+        f'style="display:block;width:100%;height:100%"></graph-stage>'
+    )
     return _iframe(body, [_read("graph-stage.js")], height)
 
 
 def concept_figure(kind: str = "power", height: int = 240):
     """3D 'why towers conflict' figure. kind = 'language' | 'power' | 'scheduling'."""
-    body = (f'<concept-figure kind="{kind}" '
-            f'style="display:block;width:100%;height:100%"></concept-figure>')
+    body = (
+        f'<concept-figure kind="{kind}" '
+        f'style="display:block;width:100%;height:100%"></concept-figure>'
+    )
     return _iframe(body, [_read("concept-figure.js")], height, three=True)
 
 
 DECK_HTML = os.path.join(DECK, "deck.dc.html")
 DECK_ASSETS = os.path.join(DECK, "assets")
-_STAGE_FILE = {"graph-stage": "graph-stage.js", "concept-figure": "concept-figure.js",
-               "mapping-stage": "mapping-stage.js"}
-FONTS = ("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700;800"
-         "&family=JetBrains+Mono&display=swap")
+_STAGE_FILE = {
+    "graph-stage": "graph-stage.js",
+    "concept-figure": "concept-figure.js",
+    "mapping-stage": "mapping-stage.js",
+}
+FONTS = (
+    "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700;800"
+    "&family=JetBrains+Mono&display=swap"
+)
 
 
 def _asset_uri(name: str, maxw: int = 1200) -> str:
@@ -102,19 +118,24 @@ def _asset_uri(name: str, maxw: int = 1200) -> str:
     import re as _re
     from io import BytesIO
     from PIL import Image
+
     path = os.path.join(DECK_ASSETS, name)
     im = Image.open(path)
     if im.width > maxw or im.mode not in ("RGB", "RGBA"):
         if im.width > maxw:
             im = im.resize((maxw, round(im.height * maxw / im.width)))
     if im.mode == "RGBA":  # keep logo transparency as PNG
-        buf = BytesIO(); im.save(buf, "PNG"); return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-    buf = BytesIO(); im.convert("RGB").save(buf, "JPEG", quality=82)
+        buf = BytesIO()
+        im.save(buf, "PNG")
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    buf = BytesIO()
+    im.convert("RGB").save(buf, "JPEG", quality=82)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
 def _sections():
     import re
+
     html = open(DECK_HTML, encoding="utf-8").read()
     return re.findall(r"(<section\b.*?</section>)", html, flags=re.S)
 
@@ -124,6 +145,7 @@ def deck_slide(index: int, height: int = 560):
     runs the deck's actual HTML + animation JS as-is (Canvas 2D / three.js)."""
     import re
     from IPython.display import HTML
+
     section = _sections()[index]
     used: set = set()
 
@@ -136,6 +158,7 @@ def deck_slide(index: int, height: int = 560):
         keep = " ".join(f'{k}="{get(k)}"' for k in ("mode", "bare", "kind") if get(k) is not None)
         style = get("style") or "width:100%;height:100%;display:block"
         return f'<{comp} {keep} style="{style}"></{comp}>'
+
     section = re.sub(r"<x-import\s+([^>]*)></x-import>", repl, section)
 
     # inline assets as data URIs (relative paths don't resolve inside srcdoc)
@@ -151,13 +174,18 @@ def deck_slide(index: int, height: int = 560):
     for comp in used - {"mapping-stage"}:
         scripts += f"<script>{_read(_STAGE_FILE[comp])}</script>"
 
-    importmap = (f'<script type="importmap">{{"imports":{{"three":"{THREE_SRC}"}}}}</script>'
-                 if three else "")
-    fit_js = ("<script>const s=document.getElementById('sl');"
-              "function f(){const k=Math.min(innerWidth/1920,innerHeight/1080);"
-              "s.style.transform='scale('+k+')';}"
-              "new ResizeObserver(f).observe(document.documentElement);"
-              "addEventListener('resize',f);f();</script>")
+    importmap = (
+        f'<script type="importmap">{{"imports":{{"three":"{THREE_SRC}"}}}}</script>'
+        if three
+        else ""
+    )
+    fit_js = (
+        "<script>const s=document.getElementById('sl');"
+        "function f(){const k=Math.min(innerWidth/1920,innerHeight/1080);"
+        "s.style.transform='scale('+k+')';}"
+        "new ResizeObserver(f).observe(document.documentElement);"
+        "addEventListener('resize',f);f();</script>"
+    )
     doc = (
         "<!doctype html><html><head><meta charset='utf-8'>"
         f"<link rel='stylesheet' href='{FONTS}'>"

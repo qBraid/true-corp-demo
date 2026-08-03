@@ -39,43 +39,43 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(HERE, "src"))
-import sleepcells as sc  # noqa: E402
+import towers as tw  # noqa: E402
 
-DATA_CSV = os.path.join(HERE, "data", "watthana_cells_real.csv")   # REAL OpenCelliD extract
+DATA_CSV = os.path.join(HERE, "data", "watthana_cells_real.csv")  # REAL OpenCelliD extract
 RESULTS = os.path.join(HERE, "results")
 CENTER = (13.731, 100.575)
-HEADLINE_ATOMS = 90     # largest densest sub-district that fits Aquila's 75 um field on real data
+HEADLINE_ATOMS = 90  # largest densest sub-district that fits Aquila's 75 um field on real data
 
 
 # --------------------------------------------------------------------------
 # Instance construction (shared pipeline)
 # --------------------------------------------------------------------------
 def build_atoms():
-    df = sc.load_cells(DATA_CSV)
-    fdf = sc.filter_cells(df)
-    sites = sc.cluster_cells_to_sites(fdf, CENTER[0], CENTER[1], radius_m=50.0)
-    atoms = sc.merge_close_sites(sites)
+    df = tw.load_cells(DATA_CSV)
+    fdf = tw.filter_cells(df)
+    sites = tw.cluster_cells_to_sites(fdf, CENTER[0], CENTER[1], radius_m=50.0)
+    atoms = tw.merge_close_sites(sites)
     provenance = {
         "data_csv": os.path.basename(DATA_CSV),
         "data_kind": "REAL OpenCelliD crowdsourced estimated positions (MCC 520, True-group MNCs; CC-BY-SA 4.0)",
         "n_cells": int(sites.n_cells),
         "n_sites": int(sites.n),
         "n_atoms_total": int(atoms.n),
-        "coverage_overlap_m": sc.COVERAGE_OVERLAP_M,
-        "merge_threshold_m": sc.MERGE_THRESHOLD_M,
+        "coverage_overlap_m": tw.COVERAGE_OVERLAP_M,
+        "merge_threshold_m": tw.MERGE_THRESHOLD_M,
     }
     return atoms, provenance
 
 
 def make_instance(atoms, k, name, provenance, exact_timeout=40.0):
-    sub = sc.select_densest(atoms, k)
-    reg = sc.affine_to_atoms(sub)                       # snapped onto Aquila's row lattice
-    sc.assert_valid_register(reg)                       # fail loudly if not Aquila-legal
-    G = sc.build_graph_from_register(reg)               # graph from the ACTUAL atom positions
+    sub = tw.select_densest(atoms, k)
+    reg = tw.affine_to_atoms(sub)  # snapped onto Aquila's row lattice
+    tw.assert_valid_register(reg)  # fail loudly if not Aquila-legal
+    G = tw.build_graph_from_register(reg)  # graph from the ACTUAL atom positions
 
-    exact_set, exact_wall, completed = sc.exact_mis(G, timeout_s=exact_timeout)
-    greedy = sc.greedy_mis(G)
-    rgreedy = sc.randomized_greedy_mis(G, restarts=300)
+    exact_set, exact_wall, completed = tw.exact_mis(G, timeout_s=exact_timeout)
+    greedy = tw.greedy_mis(G)
+    rgreedy = tw.randomized_greedy_mis(G, restarts=300)
     classical = {
         "exact_set": exact_set,
         "exact_size": (len(exact_set) if exact_set else None),
@@ -88,33 +88,38 @@ def make_instance(atoms, k, name, provenance, exact_timeout=40.0):
     }
     path = os.path.join(RESULTS, f"{name}.json")
     prov = dict(provenance, n_atoms_selected=int(reg.n))
-    sc.save_instance(path, name, sub, reg, G, classical, prov)
-    print(f"  {name}: {reg.n} atoms, avg_deg={2*G.number_of_edges()/reg.n:.1f}, "
-          f"exact_MIS={classical['exact_size']} (completed={completed}, {exact_wall:.2f}s), "
-          f"greedy={classical['greedy_size']} -> {path}")
+    tw.save_instance(path, name, sub, reg, G, classical, prov)
+    print(
+        f"  {name}: {reg.n} atoms, avg_deg={2*G.number_of_edges()/reg.n:.1f}, "
+        f"exact_MIS={classical['exact_size']} (completed={completed}, {exact_wall:.2f}s), "
+        f"greedy={classical['greedy_size']} -> {path}"
+    )
     return sub, reg, G, classical
 
 
 # --------------------------------------------------------------------------
 # REAL local-AHS-simulator shots (honest QPU stand-in) for small instances
 # --------------------------------------------------------------------------
-def local_ahs_shots(reg: sc.Register, shots=1000, steps=100, seed=None):
+def local_ahs_shots(reg: tw.Register, shots=1000, steps=100, seed=None):
     from braket.devices import LocalSimulator
-    ahs = sc.build_ahs_program(reg)
+
+    ahs = tw.build_ahs_program(reg)
     sim = LocalSimulator("braket_ahs")
-    kwargs = dict(shots=shots, blockade_radius=sc.BLOCKADE_RADIUS_UM * 1e-6, steps=steps)
+    kwargs = dict(shots=shots, blockade_radius=tw.BLOCKADE_RADIUS_UM * 1e-6, steps=steps)
     res = sim.run(ahs, **kwargs).result()
-    measurements = [{"pre": [int(x) for x in m.pre_sequence],
-                     "post": [int(x) for x in m.post_sequence]}
-                    for m in res.measurements]
+    measurements = [
+        {"pre": [int(x) for x in m.pre_sequence], "post": [int(x) for x in m.post_sequence]}
+        for m in res.measurements
+    ]
     return measurements
 
 
 # --------------------------------------------------------------------------
 # PHENOMENOLOGICAL 150-atom stand-in (documented; clearly NOT a quantum sim)
 # --------------------------------------------------------------------------
-def phenomenological_shots(G, n_atoms, shots=1000, p_empty=0.02,
-                           drop_prob=0.16, rand_frac=0.5, seed=0):
+def phenomenological_shots(
+    G, n_atoms, shots=1000, p_empty=0.02, drop_prob=0.16, rand_frac=0.5, seed=0
+):
     """Draw Aquila-like shots for a size the local simulator cannot reach.
 
     Model per shot (documented, phenomenological — this is NOT solving the
@@ -159,10 +164,14 @@ def main():
     os.makedirs(RESULTS, exist_ok=True)
     print("Building instances ...")
     atoms, provenance = build_atoms()
-    print(f"  cells {provenance['n_cells']} -> sites {provenance['n_sites']} "
-          f"-> atoms {provenance['n_atoms_total']}")
+    print(
+        f"  cells {provenance['n_cells']} -> sites {provenance['n_sites']} "
+        f"-> atoms {provenance['n_atoms_total']}"
+    )
 
-    subH, regH, GH, clH = make_instance(atoms, HEADLINE_ATOMS, f"sukhumvit_{HEADLINE_ATOMS}", provenance)
+    subH, regH, GH, clH = make_instance(
+        atoms, HEADLINE_ATOMS, f"sukhumvit_{HEADLINE_ATOMS}", provenance
+    )
     sub20, reg20, G20, cl20 = make_instance(atoms, 20, "sukhumvit_20", provenance)
     sub16, reg16, G16, cl16 = make_instance(atoms, 16, "sukhumvit_16", provenance)
 
@@ -172,36 +181,51 @@ def main():
         t0 = time.time()
         meas = local_ahs_shots(reg, shots=1000, steps=100)
         dt = time.time() - t0
-        sc.save_results(
+        tw.save_results(
             os.path.join(RESULTS, f"{name}.json"),
             instance_name=name.replace("localsim_", "sukhumvit_").replace("_results", ""),
-            n_atoms=reg.n, source="LOCAL_AHS_SIM",
+            n_atoms=reg.n,
+            source="LOCAL_AHS_SIM",
             tasks=[{"task_id": f"localsim-{reg.n}", "shots": 1000, "measurements": meas}],
             note="Real Braket local Rydberg (AHS) simulation; stand-in for the QPU.",
         )
-        sizes = [sum(1 for k in range(reg.n) if m["pre"][k] == 1 and m["post"][k] == 0)
-                 for m in meas]
+        sizes = [
+            sum(1 for k in range(reg.n) if m["pre"][k] == 1 and m["post"][k] == 0) for m in meas
+        ]
         print(f"  {name}: {dt:.1f}s  best={max(sizes)} mean={np.mean(sizes):.2f}")
 
     # ---- PHENOMENOLOGICAL headline stand-in (3 tasks x 1000 shots) ----
-    print(f"Generating phenomenological {HEADLINE_ATOMS}-atom stand-in (LABELLED, not a quantum sim) ...")
+    print(
+        f"Generating phenomenological {HEADLINE_ATOMS}-atom stand-in (LABELLED, not a quantum sim) ..."
+    )
     tasks = []
     for t in range(3):
         meas = phenomenological_shots(GH, regH.n, shots=1000, seed=100 + t)
-        tasks.append({"task_id": f"standin-{HEADLINE_ATOMS}-{t}", "shots": 1000, "measurements": meas})
-    sc.save_results(
+        tasks.append(
+            {"task_id": f"standin-{HEADLINE_ATOMS}-{t}", "shots": 1000, "measurements": meas}
+        )
+    tw.save_results(
         os.path.join(RESULTS, f"prerun_{HEADLINE_ATOMS}_results.json"),
-        instance_name=f"sukhumvit_{HEADLINE_ATOMS}", n_atoms=regH.n, source="SIMULATED_STANDIN",
+        instance_name=f"sukhumvit_{HEADLINE_ATOMS}",
+        n_atoms=regH.n,
+        source="SIMULATED_STANDIN",
         tasks=tasks,
-        note=("PLACEHOLDER. Phenomenological stand-in (random-order greedy independent "
-              "sets + loading defects), NOT a quantum simulation and NOT QPU data. "
-              "Overwrite with the real Aquila pre-run before the event."),
+        note=(
+            "PLACEHOLDER. Phenomenological stand-in (random-order greedy independent "
+            "sets + loading defects), NOT a quantum simulation and NOT QPU data. "
+            "Overwrite with the real Aquila pre-run before the event."
+        ),
     )
-    allsizes = [sum(1 for k in range(regH.n) if m["pre"][k] == 1 and m["post"][k] == 0)
-                for tk in tasks for m in tk["measurements"]]
+    allsizes = [
+        sum(1 for k in range(regH.n) if m["pre"][k] == 1 and m["post"][k] == 0)
+        for tk in tasks
+        for m in tk["measurements"]
+    ]
     exact = clH["exact_size"]
-    print(f"  prerun_{HEADLINE_ATOMS}_results: 3000 shots  best={max(allsizes)} mean={np.mean(allsizes):.1f} "
-          f"exact={exact}  approx_ratio(best/exact)={max(allsizes)/exact:.2f}")
+    print(
+        f"  prerun_{HEADLINE_ATOMS}_results: 3000 shots  best={max(allsizes)} mean={np.mean(allsizes):.1f} "
+        f"exact={exact}  approx_ratio(best/exact)={max(allsizes)/exact:.2f}"
+    )
 
 
 if __name__ == "__main__":

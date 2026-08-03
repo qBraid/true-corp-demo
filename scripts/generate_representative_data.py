@@ -4,7 +4,7 @@ generate_representative_data.py
 ===============================
 
 Builds a REPRESENTATIVE (synthetic) OpenCelliD-schema CSV of True Corporation
-cell sites in Watthana district, Bangkok, for the "Which cells can sleep tonight?"
+cell sites in Watthana district, Bangkok, for the "Which towers can share a channel?"
 demo. It writes:
 
     data/watthana_cells.csv        (OpenCelliD 14-column schema)
@@ -37,14 +37,14 @@ import numpy as np
 import pandas as pd
 
 # --- REAL Watthana / Sukhumvit geography (WGS84), from Wikipedia BTS + district ---
-BBOX = (13.710, 13.752, 100.550, 100.600)          # (min_lat, max_lat, min_lon, max_lon)
+BBOX = (13.710, 13.752, 100.550, 100.600)  # (min_lat, max_lat, min_lon, max_lon)
 CENTER = (13.731, 100.575)
 # Sukhumvit Line BTS stations threading the dense corridor (Asok -> Ekkamai)
 CORRIDOR = [
-    (13.7370, 100.5604),   # Asok (E4)
-    (13.7304, 100.5697),   # Phrom Phong (E5)
-    (13.7242, 100.5786),   # Thong Lo (E6)
-    (13.7196, 100.5852),   # Ekkamai (E7)
+    (13.7370, 100.5604),  # Asok (E4)
+    (13.7304, 100.5697),  # Phrom Phong (E5)
+    (13.7242, 100.5786),  # Thong Lo (E6)
+    (13.7196, 100.5852),  # Ekkamai (E7)
 ]
 
 # True-group MNCs under Thailand MCC 520 (competitors excluded).
@@ -87,19 +87,21 @@ def _dist_to_corridor_m(lat, lon):
 
 # Corridor midpoint (between Phrom Phong and Thong Lo) — heart of the dense core.
 CORE_CENTER = (13.7273, 100.5742)
-CORE_ROTATION_DEG = -30.0        # tilt the lattice to sit along the NE-SW corridor
+CORE_ROTATION_DEG = -30.0  # tilt the lattice to sit along the NE-SW corridor
 
 
 def _xy_to_latlon(x_m, y_m, center):
     return center[0] + y_m / _M_PER_DEG_LAT, center[1] + x_m / _m_per_deg_lon(center[0])
 
 
-def place_sites(seed: int,
-                core_spacing_m: float = 285.0,
-                core_radius_m: float = 2050.0,
-                core_jitter: float = 0.06,
-                ring_spacing_m: float = 520.0,
-                n_ring_candidates: int = 40000):
+def place_sites(
+    seed: int,
+    core_spacing_m: float = 285.0,
+    core_radius_m: float = 2050.0,
+    core_jitter: float = 0.06,
+    ring_spacing_m: float = 520.0,
+    n_ring_candidates: int = 40000,
+):
     """Place physical mast positions: a dense planned CORE plus a sparse district RING.
 
     Core: a lightly-jittered hexagonal lattice (spacing core_spacing_m) inside a
@@ -125,7 +127,7 @@ def place_sites(seed: int,
         for ix in range(-2 * n, 2 * n):
             x = ix * core_spacing_m + (iy % 2) * core_spacing_m / 2.0
             y = iy * core_spacing_m * 0.866
-            if x * x + y * y > core_radius_m ** 2:
+            if x * x + y * y > core_radius_m**2:
                 continue
             x += rng.uniform(-core_jitter * core_spacing_m, core_jitter * core_spacing_m)
             y += rng.uniform(-core_jitter * core_spacing_m, core_jitter * core_spacing_m)
@@ -146,10 +148,10 @@ def place_sites(seed: int,
         px = (lon - CORE_CENTER[1]) * mlon
         py = (lat - CORE_CENTER[0]) * _M_PER_DEG_LAT
         if px * px + py * py <= (core_radius_m + ring_spacing_m) ** 2:
-            continue                          # keep ring outside the core
+            continue  # keep ring outside the core
         ok = True
-        for (qx, qy) in ring_xy:
-            if (px - qx) ** 2 + (py - qy) ** 2 < ring_spacing_m ** 2:
+        for qx, qy in ring_xy:
+            if (px - qx) ** 2 + (py - qy) ** 2 < ring_spacing_m**2:
                 ok = False
                 break
         if ok:
@@ -166,38 +168,56 @@ def build_cells(sites, seed: int = 7) -> pd.DataFrame:
     radio_p = np.array(list(RADIO_MIX.values()))
     mncs = list(TRUE_MNC_WEIGHTS)
     mnc_p = np.array(list(TRUE_MNC_WEIGHTS.values()))
-    base_created = 1_500_000_000    # ~2017, fixed for reproducibility
-    base_updated = 1_735_000_000    # ~2024
+    base_created = 1_500_000_000  # ~2017, fixed for reproducibility
+    base_updated = 1_735_000_000  # ~2024
     rows = []
-    for (lat, lon) in sites:
+    for lat, lon in sites:
         n_cells = int(rng.integers(3, 7))
-        area = int(rng.integers(1, 65535))          # LAC/TAC shared per site
+        area = int(rng.integers(1, 65535))  # LAC/TAC shared per site
         for _ in range(n_cells):
             radio = radios[rng.choice(len(radios), p=radio_p)]
             mnc = int(mncs[rng.choice(len(mncs), p=mnc_p)])
             # cells on one mast scatter within ~10-25 m (antenna offsets / estimate noise)
             jx, jy = rng.normal(0, 18), rng.normal(0, 18)
             c_lat, c_lon = _latlon_offset(lat, lon, jx, jy)
-            rows.append({
-                "radio": radio,
-                "mcc": 520,
-                "net": mnc,
-                "area": area,
-                "cell": int(rng.integers(1, 268_435_455)),
-                "unit": int(rng.integers(0, 504)),        # PCI-like
-                "lon": round(c_lon, 7),
-                "lat": round(c_lat, 7),
-                "range": int(RADIO_RANGE_M[radio] * rng.uniform(0.7, 1.4)),
-                "samples": int(rng.integers(1, 200)),
-                "changeable": 1,                            # estimated from samples
-                "created": base_created + int(rng.integers(0, 200_000_000)),
-                "updated": base_updated + int(rng.integers(0, 20_000_000)),
-                "averageSignal": 0,
-            })
+            rows.append(
+                {
+                    "radio": radio,
+                    "mcc": 520,
+                    "net": mnc,
+                    "area": area,
+                    "cell": int(rng.integers(1, 268_435_455)),
+                    "unit": int(rng.integers(0, 504)),  # PCI-like
+                    "lon": round(c_lon, 7),
+                    "lat": round(c_lat, 7),
+                    "range": int(RADIO_RANGE_M[radio] * rng.uniform(0.7, 1.4)),
+                    "samples": int(rng.integers(1, 200)),
+                    "changeable": 1,  # estimated from samples
+                    "created": base_created + int(rng.integers(0, 200_000_000)),
+                    "updated": base_updated + int(rng.integers(0, 20_000_000)),
+                    "averageSignal": 0,
+                }
+            )
     df = pd.DataFrame(rows)
     # OpenCelliD column order
-    return df[["radio", "mcc", "net", "area", "cell", "unit", "lon", "lat",
-               "range", "samples", "changeable", "created", "updated", "averageSignal"]]
+    return df[
+        [
+            "radio",
+            "mcc",
+            "net",
+            "area",
+            "cell",
+            "unit",
+            "lon",
+            "lat",
+            "range",
+            "samples",
+            "changeable",
+            "created",
+            "updated",
+            "averageSignal",
+        ]
+    ]
 
 
 PROVENANCE = """\
@@ -241,8 +261,9 @@ def main():
     # Calibrated so the densest 150-atom sub-district lands at avg degree ~8,
     # fits the 75 um field, has exact MIS ~40 (deck headline 41/150), and the
     # exact classical solver finishes in a few seconds.
-    sites = place_sites(seed=3, core_spacing_m=285.0, core_radius_m=2050.0,
-                        core_jitter=0.06, ring_spacing_m=520.0)
+    sites = place_sites(
+        seed=3, core_spacing_m=285.0, core_radius_m=2050.0, core_jitter=0.06, ring_spacing_m=520.0
+    )
     df = build_cells(sites, seed=7)
 
     csv_path = os.path.join(data_dir, "watthana_cells.csv")

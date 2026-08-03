@@ -36,17 +36,17 @@ which_towers_can_share_a_channel.ipynb   the deck + runnable code (slides are li
 qpu_result_widgets.ipynb                 interactive widgets over the real Aquila result
 requirements.txt
 src/                 importable modules (added to sys.path by each notebook)
-  sleepcells.py        pipeline: scale, unit-disk graph, AHS program, classical solvers, reports
+  towers.py            pipeline: scale, unit-disk graph, AHS program, classical solvers, reports
   channels.py          iterated-MIS graph colouring + exact chromatic-number baseline
-  sleepviz.py          matplotlib figures
-  sleepwidgets.py      Plotly + ipywidgets result widgets (dark qBraid theme)
+  viz.py               matplotlib figures
+  widgets.py           Plotly + ipywidgets result widgets (dark qBraid theme)
   deckwidgets.py       renders each deck slide as a live sandboxed iframe (deck_slide)
   nbsetup.py           environment bootstrap
 deck/                deck.dc.html + graph-stage.js / concept-figure.js / mapping-stage.js + assets/
 data/                real OpenCelliD extract (Watthana, MCC 520, True-group LTE/UMTS) + basemap
 results/             instances, real QPU shot stores, channel assignment, slide-map PNGs
 scripts/             build + experiment scripts (see below)
-slides/  resources/  legacy slide PNGs / device image
+resources/           QuEra Aquila device image
 docs/    examples/   source deck PDFs / notes; the standalone deck-animations demo
 ```
 
@@ -79,7 +79,7 @@ Jobs are submitted only by the presenter, from `scripts/run_channel_qpu.py --run
 
 ---
 
-## Honesty constraints (printed by `sleepcells.print_assumptions`)
+## Honesty constraints (printed by `towers.print_assumptions`)
 
 - **Protocol (unit-disk) model, not physical** — conflicts are binary and pairwise; real
   interference aggregates and fails on a threshold ratio.

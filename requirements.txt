@@ -1,4 +1,4 @@
-# "Which cells can sleep tonight?" — demo dependencies
+# "Which towers can share a channel?" — demo dependencies
 # Python >= 3.10.  Runs on qBraid Lab with pre-configured credentials.
 # Do NOT add boto3 / AWS keys — device access goes through qBraid.
 qbraid>=0.11.0          # API V2; earlier versions are incompatible
