@@ -34,6 +34,28 @@ MEASURED = '![QuEra Aquila on qBraid](resources/quera-device-image.png)\n\n**How
 
 ASSUME = "tw.print_assumptions()"
 
+NEXTSTEPS = (
+    "## Next steps: the qBraid Vault Challenge\n"
+    "\n"
+    "Interested in working live with other users on qBraid? Come join the "
+    "**Vault Challenge**: work alongside the qBraid community and stand a chance to win prizes.\n"
+    "\n"
+    "**Thirteen quantum vaults. Two weeks. One question: can you unscramble them?** "
+    "Each vault hides a circuit that scrambles a register of qubits away from all-zeros; "
+    "your job is to write a circuit that runs after it and drives the system back to `|0…0⟩`. "
+    "The catch: a perfect solution is not automatically the best one. Your score is the "
+    "probability of landing on all-zeros, scaled down by every two-qubit gate you spend "
+    "getting there.\n"
+    "\n"
+    "**Prizes**\n"
+    "- 🥇 $100 Amazon gift card + 10,000 qBraid credits\n"
+    "- 🥈 $50 + 5,000 credits\n"
+    "- 🥉 $25 + 2,500 credits\n"
+    "- Credits pay for real QPU time, GPU compute, and AI usage with leading models.\n"
+    "\n"
+    "👉 **Join the challenge:** https://account.qbraid.com/explore?tab=challenges"
+)
+
 
 def build():
     cells = [
@@ -64,6 +86,7 @@ def build():
         code("dw.deck_slide(9)"),  # 10 Path forward
         code("dw.deck_slide(10)"),  # 11 Assumptions
         code(ASSUME),
+        md(NEXTSTEPS),
     ]
     nb = nbf.v4.new_notebook()
     nb["cells"] = cells
