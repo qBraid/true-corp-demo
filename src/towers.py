@@ -1,20 +1,20 @@
 """
-sleepcells.py — core pipeline for "Which cells can sleep tonight?"
+towers.py — core pipeline for "Which towers can share a channel?"
 
-Maps a real cellular-network coverage problem (which sites can be put to sleep at
-3 a.m. without opening a coverage hole) onto Maximum Independent Set (MIS) on a
-unit-disk graph, and from there onto QuEra's Aquila neutral-atom processor via an
-Analog Hamiltonian Simulation (AHS) sweep.
+Maps a real cellular-network reuse problem (which towers can transmit on one slice
+of spectrum without interfering) onto Maximum Independent Set (MIS) on a unit-disk
+graph, and from there onto QuEra's Aquila neutral-atom processor via an Analog
+Hamiltonian Simulation (AHS) sweep. Repeating the MIS on the residual graph turns
+one channel into a full frequency-reuse plan (graph colouring); see `channels.py`.
 
 This module is the single source of truth for the demo. The companion notebook
-`which_cells_can_sleep.ipynb` embeds the same functions inline so it is fully
-self-contained; the offline scripts in scripts/ import from here.
+`which_towers_can_share_a_channel.ipynb` and the offline scripts in scripts/ import
+from here.
 
-Honesty note baked into the code: the MIS formulation is a *conservative*
-relaxation of the true "minimum dominating set" energy-optimum. Independent set
-guarantees a valid coverage certificate (no two sleeping cells are neighbours, so
-every sleeping cell's area stays covered by an awake neighbour) but may leave
-savings unclaimed. See `verify_independent_set` and the module docstrings.
+The MIS is exactly the co-channel constraint: an independent set is a group of
+towers no two of which conflict, so they can all reuse the same frequency at once.
+The coverage/interference certificate is `verify_independent_set` (no edge lies
+inside the set). See the module docstrings for the mapping details.
 """
 
 from __future__ import annotations
@@ -37,15 +37,15 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 # Top-of-notebook knob. If a district does not fit the field of view, change this.
-COVERAGE_OVERLAP_M = 500.0          # two sites "mutually cover" within this many metres
+COVERAGE_OVERLAP_M = 500.0  # two sites "mutually cover" within this many metres
 
-BLOCKADE_RADIUS_UM = 8.4            # R_b = (C6 / Omega)^(1/6) at Omega_max
-SCALE_M_PER_UM = COVERAGE_OVERLAP_M / BLOCKADE_RADIUS_UM      # ~= 59.5 m per um
+BLOCKADE_RADIUS_UM = 8.4  # R_b = (C6 / Omega)^(1/6) at Omega_max
+SCALE_M_PER_UM = COVERAGE_OVERLAP_M / BLOCKADE_RADIUS_UM  # ~= 59.5 m per um
 
-MIN_SEPARATION_UM = 4.0             # Aquila hard floor on atom separation
-MERGE_THRESHOLD_M = MIN_SEPARATION_UM * SCALE_M_PER_UM        # ~= 238 m
-FIELD_UM = 75.0                     # Aquila field of view (short side); verify live
-FIELD_M = FIELD_UM * SCALE_M_PER_UM                          # ~= 4.5 km
+MIN_SEPARATION_UM = 4.0  # Aquila hard floor on atom separation
+MERGE_THRESHOLD_M = MIN_SEPARATION_UM * SCALE_M_PER_UM  # ~= 238 m
+FIELD_UM = 75.0  # Aquila field of view (short side); verify live
+FIELD_M = FIELD_UM * SCALE_M_PER_UM  # ~= 4.5 km
 
 # ---------------------------------------------------------------------------
 # 2. DEVICE FACTS  — QuEra Aquila (verified against AWS Braket / QuEra specs).
@@ -54,15 +54,15 @@ FIELD_M = FIELD_UM * SCALE_M_PER_UM                          # ~= 4.5 km
 #    NOT exposed through qBraid read-only and are taken from published specs.
 # ---------------------------------------------------------------------------
 
-AQUILA_DEVICE_ID = "aws:quera:qpu:aquila"     # confirmed live on qBraid (NOT "quera_aquila")
+AQUILA_DEVICE_ID = "aws:quera:qpu:aquila"  # confirmed live on qBraid (NOT "quera_aquila")
 AQUILA_MAX_ATOMS = 256
-AQUILA_SHOTS_MAX = 1000                        # hard per-task ceiling (minShots=1)
+AQUILA_SHOTS_MAX = 1000  # hard per-task ceiling (minShots=1)
 
-OMEGA_MAX = 1.57e7          # rad/s  (~2.5 MHz); must start and end at 0 rad/s
-DELTA_START = -2 * math.pi * 5e6    # rad/s  (negative -> trivial all-down ground state)
-DELTA_END = +2 * math.pi * 5e6      # rad/s  (positive -> MIS is the ground state)
-T_TOTAL = 4.0e-6           # s  (4 us, coherence-limited hard ceiling)
-T_RAMP = 0.3e-6            # s  (Omega ramp up / down)
+OMEGA_MAX = 1.57e7  # rad/s  (~2.5 MHz); must start and end at 0 rad/s
+DELTA_START = -2 * math.pi * 5e6  # rad/s  (negative -> trivial all-down ground state)
+DELTA_END = +2 * math.pi * 5e6  # rad/s  (positive -> MIS is the ground state)
+T_TOTAL = 4.0e-6  # s  (4 us, coherence-limited hard ceiling)
+T_RAMP = 0.3e-6  # s  (Omega ramp up / down)
 
 
 # ===========================================================================
@@ -77,9 +77,9 @@ THAILAND_MCC = 520
 # TrueMove H, 25 = True Corp legacy. Competitors excluded: AIS = {01,03,23}, NT = {02,15,47}.
 TRUE_GROUP_MNCS = (0, 4, 5, 18, 25, 99)
 
-# Only the BROADBAND layers are sleep candidates. GSM is deliberately left OUT: it stays
-# awake as the always-on coverage floor, so sleeping LTE/UMTS never drops a user to 2G speeds.
-SLEEP_CANDIDATE_RADIOS = ("LTE", "UMTS", "NR")
+# Only the BROADBAND layers are modelled. GSM is deliberately left OUT: it is the
+# always-on 2G coverage floor and is not part of the broadband reuse plan.
+BROADBAND_RADIOS = ("LTE", "UMTS", "NR")
 
 
 def load_cells(csv_path: str) -> pd.DataFrame:
@@ -103,14 +103,14 @@ def filter_cells(
     mcc: int = THAILAND_MCC,
     mncs: Iterable[int] = TRUE_GROUP_MNCS,
     bbox: tuple[float, float, float, float] | None = None,
-    radios: Iterable[str] | None = SLEEP_CANDIDATE_RADIOS,
+    radios: Iterable[str] | None = BROADBAND_RADIOS,
 ) -> pd.DataFrame:
-    """Filter to one operator group (and, by default, the broadband sleep-candidate
-    radios) inside a lat/lon bounding box.
+    """Filter to one operator group (and, by default, the broadband radios) inside a
+    lat/lon bounding box.
 
     bbox   = (min_lat, max_lat, min_lon, max_lon).
-    radios = radio generations kept; default excludes GSM so 2G stays awake as the
-             coverage floor. Pass None to keep all radios.
+    radios = radio generations kept; default excludes GSM (the 2G coverage floor,
+             not part of the broadband reuse plan). Pass None to keep all radios.
     """
     m = df["mcc"] == mcc
     m &= df["net"].isin(list(mncs))
@@ -141,10 +141,11 @@ def latlon_to_local_m(lat, lon, ref_lat: float, ref_lon: float):
 @dataclass
 class Sites:
     """A set of physical cell sites in local metres, with provenance counts."""
-    xy_m: np.ndarray                 # (n, 2) local metres
-    lat: np.ndarray                  # (n,) original degrees (for map plots)
+
+    xy_m: np.ndarray  # (n, 2) local metres
+    lat: np.ndarray  # (n,) original degrees (for map plots)
     lon: np.ndarray
-    n_cells: int                     # cells that fed into these sites
+    n_cells: int  # cells that fed into these sites
     cell_counts: np.ndarray = field(default_factory=lambda: np.array([]))
 
     @property
@@ -226,8 +227,7 @@ def merge_close_sites(sites: Sites, threshold_m: float = MERGE_THRESHOLD_M) -> S
         lon = np.append(lon[keep], new_lon)
         w = np.append(w[keep], wi + wj)
 
-    return Sites(xy_m=xy, lat=lat, lon=lon, n_cells=sites.n_cells,
-                 cell_counts=w.astype(int))
+    return Sites(xy_m=xy, lat=lat, lon=lon, n_cells=sites.n_cells, cell_counts=w.astype(int))
 
 
 def select_densest(sites: Sites, k: int, overlap_m: float = COVERAGE_OVERLAP_M) -> Sites:
@@ -252,16 +252,21 @@ def select_densest(sites: Sites, k: int, overlap_m: float = COVERAGE_OVERLAP_M) 
     seed_xy = xy[core_mask].mean(axis=0)
     d_seed = np.hypot(xy[:, 0] - seed_xy[0], xy[:, 1] - seed_xy[1])
     idx = np.sort(np.argsort(d_seed)[:k])
-    return Sites(xy_m=xy[idx], lat=sites.lat[idx], lon=sites.lon[idx],
-                 n_cells=sites.n_cells, cell_counts=sites.cell_counts[idx])
+    return Sites(
+        xy_m=xy[idx],
+        lat=sites.lat[idx],
+        lon=sites.lon[idx],
+        n_cells=sites.n_cells,
+        cell_counts=sites.cell_counts[idx],
+    )
 
 
 def build_graph(sites: Sites, overlap_m: float = COVERAGE_OVERLAP_M) -> nx.Graph:
     """Unit-disk coverage graph: an edge between two sites within overlap_m.
 
-    An edge means 'these two mutually cover': if both slept, the overlap region
-    could open a hole, so at most one of an edge's endpoints may sleep. That is
-    exactly the independent-set constraint.
+    An edge means 'these two mutually cover': if both transmitted on the same
+    frequency the overlap region would interfere, so at most one endpoint of an
+    edge may take a given channel. That is exactly the independent-set constraint.
     """
     xy = sites.xy_m
     G = nx.Graph()
@@ -326,7 +331,8 @@ def _convex_hull(points: np.ndarray) -> np.ndarray:
 @dataclass
 class Register:
     """Atom register: positions in micrometres and in metres (Aquila schema)."""
-    coords_um: np.ndarray            # (n, 2) micrometres, origin at min-corner
+
+    coords_um: np.ndarray  # (n, 2) micrometres, origin at min-corner
     scale_m_per_um: float
     rotation_rad: float
 
@@ -339,8 +345,12 @@ class Register:
         return len(self.coords_um)
 
 
-def snap_to_aquila(coords_um: np.ndarray, row_min_um: float = MIN_SEPARATION_UM,
-                   x_min_um: float = MIN_SEPARATION_UM, resolution_um: float = 0.1) -> np.ndarray:
+def snap_to_aquila(
+    coords_um: np.ndarray,
+    row_min_um: float = MIN_SEPARATION_UM,
+    x_min_um: float = MIN_SEPARATION_UM,
+    resolution_um: float = 0.1,
+) -> np.ndarray:
     """Snap a register onto Aquila's ROW lattice — a hard hardware constraint.
 
     Aquila requires that for any two atoms the *y*-separation is either exactly 0
@@ -403,9 +413,9 @@ def affine_to_atoms(sites: Sites, scale_m_per_um: float = SCALE_M_PER_UM) -> Reg
     c, s = math.cos(ang), math.sin(ang)
     R = np.array([[c, -s], [s, c]])
     xy_rot = xy @ R.T
-    xy_rot = xy_rot - xy_rot.min(axis=0)          # origin at min corner
+    xy_rot = xy_rot - xy_rot.min(axis=0)  # origin at min corner
     coords_um = xy_rot / scale_m_per_um
-    coords_um = snap_to_aquila(coords_um)         # enforce Aquila row / spacing / resolution
+    coords_um = snap_to_aquila(coords_um)  # enforce Aquila row / spacing / resolution
     coords_um = coords_um - coords_um.min(axis=0)  # re-origin after snapping
     return Register(coords_um=coords_um, scale_m_per_um=scale_m_per_um, rotation_rad=ang)
 
@@ -429,9 +439,46 @@ def build_graph_from_register(reg: Register, overlap_m: float = COVERAGE_OVERLAP
     return G
 
 
+def random_conflict_graph(n=12, seed=None, min_sep_um=5.0, span_um=None, max_resample=400):
+    """A random n-tower conflict graph, as an Aquila-style atom register.
+
+    Atoms are placed by Poisson-disk sampling (every pair at least min_sep_um apart,
+    so none sits below the hardware floor) inside a square of side span_um; their
+    unit-disk (blockade) graph is the interference graph. span_um defaults to about
+    7*sqrt(n) um so the ~8.4 um blockade captures a realistic mix of neighbours.
+
+    seed=None gives a fresh random instance each call (resampled until no tower is
+    isolated, for a livelier teaching graph); pass an int for a reproducible one.
+    Returns (reg, G, coords_um).
+    """
+    if span_um is None:
+        span_um = 7.0 * math.sqrt(n)
+    master = np.random.default_rng(seed)
+    reg = G = coords = None
+    for _ in range(max_resample):
+        rng = np.random.default_rng(int(master.integers(0, 2**63 - 1)))
+        pts: list[np.ndarray] = []
+        tries = 0
+        while len(pts) < n and tries < 50_000:
+            tries += 1
+            p = rng.uniform(0, span_um, size=2)
+            if all(math.hypot(p[0] - q[0], p[1] - q[1]) >= min_sep_um for q in pts):
+                pts.append(p)
+        coords = np.asarray(pts) - np.min(pts, axis=0)
+        reg = Register(coords_um=coords, scale_m_per_um=SCALE_M_PER_UM, rotation_rad=0.0)
+        G = build_graph_from_register(reg)
+        lively = G.number_of_nodes() == n and (n < 2 or min(d for _, d in G.degree()) >= 1)
+        if lively or seed is not None:
+            return reg, G, coords
+    return reg, G, coords
+
+
 def assert_valid_register(
-    reg: Register, min_sep_um: float = MIN_SEPARATION_UM, field_um: float = FIELD_UM,
-    row_min_um: float = MIN_SEPARATION_UM, resolution_um: float = 0.1
+    reg: Register,
+    min_sep_um: float = MIN_SEPARATION_UM,
+    field_um: float = FIELD_UM,
+    row_min_um: float = MIN_SEPARATION_UM,
+    resolution_um: float = 0.1,
 ) -> dict:
     """Fail loudly unless the register satisfies EVERY Aquila hardware constraint.
 
@@ -452,7 +499,7 @@ def assert_valid_register(
             dx, dy = xy[i, 0] - xy[j, 0], xy[i, 1] - xy[j, 1]
             dmin = min(dmin, math.hypot(dx, dy))
             ady = abs(dy)
-            if 1e-6 < ady < row_min_um - 1e-6:            # y-sep neither 0 nor >= floor
+            if 1e-6 < ady < row_min_um - 1e-6:  # y-sep neither 0 nor >= floor
                 y_violation = y_violation or (i, j, ady)
     width, height = float(np.ptp(xy[:, 0])), float(np.ptp(xy[:, 1]))
     off_grid = float(np.max(np.abs(xy - np.round(xy / resolution_um) * resolution_um)))
@@ -469,22 +516,20 @@ def assert_valid_register(
             f">= {row_min_um} um. The register must be snapped to rows (snap_to_aquila)."
         )
     if off_grid > 1e-6:
-        raise AssertionError(
-            f"Coordinates off the {resolution_um} um grid by {off_grid:.4f} um."
-        )
+        raise AssertionError(f"Coordinates off the {resolution_um} um grid by {off_grid:.4f} um.")
     if not (width <= field_um + 1e-6 and height <= field_um + 1e-6):
         raise AssertionError(
             f"Register {width:.1f} x {height:.1f} um exceeds field {field_um} um. "
             f"Reduce COVERAGE_OVERLAP_M or pick a smaller sub-district."
         )
     n_rows = len(np.unique(np.round(xy[:, 1] / resolution_um).astype(int)))
-    return {"min_sep_um": dmin, "width_um": width, "height_um": height,
-            "n": n, "n_rows": n_rows}
+    return {"min_sep_um": dmin, "width_um": width, "height_um": height, "n": n, "n_rows": n_rows}
 
 
 # ===========================================================================
 # 4. AHS PROGRAM  — the quasi-adiabatic MIS sweep
 # ===========================================================================
+
 
 def build_ahs_program(
     reg: Register,
@@ -529,11 +574,11 @@ def build_ahs_program(
     omega.put(0.0, 0.0)
     omega.put(t_ramp, omega_max)
     omega.put(t_total - t_ramp, omega_max)
-    omega.put(t_total, 0.0)                       # must end at 0 rad/s
+    omega.put(t_total, 0.0)  # must end at 0 rad/s
 
     detuning = TimeSeries()
     detuning.put(0.0, delta_start)
-    detuning.put(t_total, delta_end)              # monotonic sweep
+    detuning.put(t_total, delta_end)  # monotonic sweep
 
     phase = TimeSeries()
     phase.put(0.0, 0.0)
@@ -546,6 +591,7 @@ def build_ahs_program(
         # Weighted-MIS path (default OFF): static per-site h_k pattern in [0,1],
         # only the overall magnitude is time-dependent. Left as a one-flag hook.
         from braket.ahs import LocalDetuning
+
         w = np.asarray(weights, dtype=float)
         w = w / (w.max() if w.max() > 0 else 1.0)
         mag = TimeSeries()
@@ -554,18 +600,33 @@ def build_ahs_program(
         local = LocalDetuning.from_lists(
             times=[0.0, t_total], values=[0.0, delta_end], pattern=list(w)
         )
-        ahs = AnalogHamiltonianSimulation(
-            register=register, hamiltonian=drive + local
-        )
+        ahs = AnalogHamiltonianSimulation(register=register, hamiltonian=drive + local)
     return ahs
+
+
+def mis_on_simulator(reg: Register, G: nx.Graph, shots: int = 200, policy: str = "postselect"):
+    """Solve the MIS as an AHS sweep on the LOCAL braket_ahs simulator (never the QPU),
+    and return the largest valid independent set measured, with blockade violations
+    rejected. This is the same program `build_ahs_program` would submit to Aquila, run
+    on a classical Rydberg simulator so the notebook stays self-contained and offline.
+    """
+    from braket.devices import LocalSimulator
+
+    ahs = build_ahs_program(reg)
+    result = LocalSimulator("braket_ahs").run(ahs, shots=shots).result()
+    selections, _retained, _total, _defect = decode_shots(result.measurements, reg.n, policy=policy)
+    best, _violations, _n_valid = best_valid_set(selections, G)
+    return best
 
 
 # ===========================================================================
 # 5. RESULT DECODING  — the inverted bit semantics
 # ===========================================================================
 
+
 def rydberg_selected(pre_sequence: Sequence[int], post_sequence: Sequence[int]) -> list[int]:
-    """Return the indices of atoms that are IN the independent set (cells that sleep).
+    """Return the indices of atoms that are IN the independent set (towers that share
+    the channel).
 
     Aquila result bit semantics are INVERTED from intuition:
       pre_sequence[k]:  0 = trap empty,           1 = atom loaded
@@ -574,8 +635,7 @@ def rydberg_selected(pre_sequence: Sequence[int], post_sequence: Sequence[int]) 
     was loaded AND ended up NOT in the ground state:
         selected  <=>  pre[k] == 1 and post[k] == 0
     """
-    return [k for k in range(len(pre_sequence))
-            if pre_sequence[k] == 1 and post_sequence[k] == 0]
+    return [k for k in range(len(pre_sequence)) if pre_sequence[k] == 1 and post_sequence[k] == 0]
 
 
 def is_fully_loaded(pre_sequence: Sequence[int]) -> bool:
@@ -610,6 +670,7 @@ def decode_shots(measurements, n_atoms: int, policy: str = "postselect"):
 # ===========================================================================
 # 6. CLASSICAL BASELINES  — expected to WIN on these sizes
 # ===========================================================================
+
 
 def greedy_mis(G: nx.Graph) -> list[int]:
     """Min-degree-first greedy independent set."""
@@ -667,8 +728,10 @@ def exact_mis(G: nx.Graph, timeout_s: float = 20.0) -> tuple[list[int] | None, f
     have_alarm = hasattr(signal, "SIGALRM")
     old_handler = None
     if have_alarm and timeout_s and timeout_s > 0:
+
         def _handler(signum, frame):
             raise _Timeout()
+
         old_handler = signal.signal(signal.SIGALRM, _handler)
         signal.setitimer(signal.ITIMER_REAL, timeout_s)
     try:
@@ -686,14 +749,15 @@ def exact_mis(G: nx.Graph, timeout_s: float = 20.0) -> tuple[list[int] | None, f
 
 
 # ===========================================================================
-# 7. COVERAGE CERTIFICATE + MONEY MODEL
+# 7. COVERAGE CERTIFICATE
 # ===========================================================================
 
-def verify_independent_set(G: nx.Graph, S: Iterable[int]) -> bool:
-    """True iff S is a valid independent set (no two sleeping cells are neighbours).
 
-    This is the coverage certificate: because no edge lies inside S, every
-    sleeping cell has all its coverage-overlap neighbours awake.
+def verify_independent_set(G: nx.Graph, S: Iterable[int]) -> bool:
+    """True iff S is a valid independent set (no two co-channel towers are neighbours).
+
+    This is the reuse certificate: because no edge lies inside S, no two towers on
+    the same channel have overlapping coverage, so they never interfere.
     """
     S = set(S)
     for u, v in G.edges():
@@ -707,6 +771,7 @@ def repair_to_independent_set(G: nx.Graph, S: Iterable[int]) -> list[int]:
     most blockade violations. Used ONLY as a safety net if a hardware shot broke the
     blockade (two adjacent atoms both excited) and no clean shot exists."""
     from collections import Counter
+
     S = set(S)
     while True:
         bad = list(G.subgraph(S).edges())
@@ -738,84 +803,6 @@ def best_valid_set(selections, G: nx.Graph):
     if not selections:
         return [], 0, 0
     return repair_to_independent_set(G, max(selections, key=len)), n_violations, 0
-
-
-# --- Money-model constants. True's OWN published numbers where possible; the
-#     two physical levers (SITE_POWER_KW, LOW_TRAFFIC_HOURS) are flagged as
-#     assumptions in the notebook's assumptions block. ---
-TARIFF_THB_PER_KWH = 4.69      # implied by True's 2023 AI/ML saving: 42,000 MWh booked as THB 197M
-GRID_TCO2E_PER_MWH = 0.45      # implied by True: 64,000 MWh -> 28,800 tCO2e avoided
-SITE_POWER_KW = 4.0            # ASSUMPTION — biggest lever; True's network team can replace it
-RADIO_SHARE = 0.60            # radio share of a site's draw; rest is cooling/baseband/transmission
-DEEP_SLEEP_SAVING = 0.70      # Vodafone UK + Ericsson, London 2025 (deep sleep, low-traffic hours)
-LOW_TRAFFIC_HOURS = 6.0       # ASSUMPTION — our modelling of the night window (not a 3GPP constant)
-# "One Network" integrated base stations (True's own 17,000+ figure). True's total
-# post-merger site count has been cited higher (~30,000); using 17,000 is the
-# CONSERVATIVE choice — the larger number would roughly double every baht below.
-NATIONAL_SITES = 17_000
-
-
-def money_model(
-    n_asleep: int,
-    n_sites_district: int,
-    site_power_kw: float = SITE_POWER_KW,
-    radio_share: float = RADIO_SHARE,
-    deep_sleep_saving: float = DEEP_SLEEP_SAVING,
-    low_traffic_hours: float = LOW_TRAFFIC_HOURS,
-    tariff: float = TARIFF_THB_PER_KWH,
-    grid_factor: float = GRID_TCO2E_PER_MWH,
-    national_sites: int = NATIONAL_SITES,
-) -> dict:
-    """Energy, baht and CO2 saved by sleeping n_asleep sites, plus national extrapolation.
-
-    Energy saved per sleeping site per night (kWh):
-        site_power_kw * radio_share * deep_sleep_saving * low_traffic_hours
-    Only the RADIO share is put to sleep; cooling/baseband/transmission stay on.
-    """
-    kwh_per_site_night = site_power_kw * radio_share * deep_sleep_saving * low_traffic_hours
-    district_kwh_night = kwh_per_site_night * n_asleep
-    district_kwh_year = district_kwh_night * 365
-    district_thb_year = district_kwh_year * tariff
-    district_tco2e_year = district_kwh_year / 1000.0 * grid_factor
-
-    extrapolation = national_sites / n_sites_district if n_sites_district else 0.0
-    national_kwh_year = district_kwh_year * extrapolation
-    national_thb_year = district_thb_year * extrapolation
-    national_tco2e_year = district_tco2e_year * extrapolation
-    return {
-        "kwh_per_site_night": kwh_per_site_night,
-        "district_kwh_year": district_kwh_year,
-        "district_thb_year": district_thb_year,
-        "district_tco2e_year": district_tco2e_year,
-        "extrapolation_factor": extrapolation,
-        "national_kwh_year": national_kwh_year,
-        "national_thb_year": national_thb_year,
-        "national_tco2e_year": national_tco2e_year,
-    }
-
-
-def sensitivity_table(
-    n_sites_district: int,
-    incremental_points=(0.10, 0.15, 0.25),
-    **money_kwargs,
-) -> pd.DataFrame:
-    """National baht/year across incremental-sleep deltas vs per-cell rules.
-
-    Each row: an extra X percentage points of sites put to sleep beyond what
-    simple per-cell rules already achieve, and the resulting national THB/year.
-    """
-    rows = []
-    for pts in incremental_points:
-        extra_sites = pts * n_sites_district
-        m = money_model(extra_sites, n_sites_district, **money_kwargs)
-        rows.append({
-            "incremental_sleep_points": f"+{int(pts*100)} pts",
-            "extra_sites_district": round(extra_sites, 1),
-            "national_THB_per_year": round(m["national_thb_year"], 0),
-            "national_MWh_per_year": round(m["national_kwh_year"] / 1000.0, 0),
-            "national_tCO2e_per_year": round(m["national_tco2e_year"], 0),
-        })
-    return pd.DataFrame(rows)
 
 
 # ===========================================================================
@@ -854,6 +841,7 @@ class Shot:
     Mirrors braket's ShotResult so `decode_shots` works identically on both a
     live QPU/simulator result and a loaded-from-disk pre-run.
     """
+
     __slots__ = ("pre_sequence", "post_sequence", "status")
 
     def __init__(self, pre_sequence, post_sequence, status="Success"):
@@ -862,8 +850,9 @@ class Shot:
         self.status = status
 
 
-def save_instance(path, name, sub: "Sites", reg: Register, G: nx.Graph,
-                  classical: dict, provenance: dict) -> None:
+def save_instance(
+    path, name, sub: "Sites", reg: Register, G: nx.Graph, classical: dict, provenance: dict
+) -> None:
     """Serialise an instance (atoms, graph, classical solutions) to JSON."""
     data = {
         "name": name,
@@ -948,107 +937,34 @@ def register_from_instance(inst: dict) -> Register:
 # 10. REPORTING  — the printed blocks the demo shows (tied to the constants)
 # ===========================================================================
 
-def print_scale_table() -> None:
-    """The scale table: Sukhumvit rendered on the chip (chip units vs network units)."""
-    print(f"{'quantity':30s}{'chip':>12s}{'network':>16s}")
-    print("-" * 58)
-    print(f"{'blockade radius / overlap':30s}{BLOCKADE_RADIUS_UM:>10.1f} µm{COVERAGE_OVERLAP_M:>13.0f} m")
-    print(f"{'min atom spacing / merge':30s}{MIN_SEPARATION_UM:>10.1f} µm{MERGE_THRESHOLD_M:>13.0f} m")
-    print(f"{'field of view':30s}{FIELD_UM:>10.1f} µm{FIELD_M/1000:>11.2f} km")
-    print(f"{'scale factor':30s}{'':>12s}{SCALE_M_PER_UM:>11.1f} m/µm")
-
 
 def print_assumptions() -> None:
-    """The consolidated assumptions block — every figure below rests on these."""
+    """The consolidated assumptions block: every figure rests on these."""
     print("=" * 74)
-    print("ASSUMPTIONS  ·  'Which cells can sleep tonight?'")
+    print("ASSUMPTIONS  \u00b7  Which towers can share a channel?")
     print("=" * 74)
     print("SCALE MAPPING (nothing tuned to flatter the hardware):")
-    print(f"  coverage overlap        {COVERAGE_OVERLAP_M:6.0f} m   <-> blockade radius {BLOCKADE_RADIUS_UM} µm")
-    print(f"  scale factor            {SCALE_M_PER_UM:6.1f} m per µm")
-    print(f"  min site merge distance {MERGE_THRESHOLD_M:6.0f} m   <-> min atom spacing {MIN_SEPARATION_UM} µm")
-    print(f"  field of view           {FIELD_M/1000:6.2f} km  <-> {FIELD_UM} µm (narrower than a human hair)")
-    print("  → 4.5 km of Sukhumvit, rendered in an area narrower than a hair. We did NOT tune")
-    print("    the blockade radius to match — that is where rubidium happens to sit.")
-    print("-" * 74)
-    print("ASSUMPTIONS (flagged where not a measured or published constant):")
-    print(f"  [assumed] site power        {SITE_POWER_KW:4.1f} kW      — largest lever on the money model")
-    print(f"            radio share       {RADIO_SHARE:4.0%}        — rest is cooling / baseband / transmission")
-    print(f"            deep-sleep saving {DEEP_SLEEP_SAVING:4.0%}        — Vodafone UK + Ericsson, London 2025")
-    print(f"  [assumed] low-traffic window {LOW_TRAFFIC_HOURS:4.1f} h     — night window (not a 3GPP constant)")
-    print(f"            tariff            {TARIFF_THB_PER_KWH:4.2f} THB/kWh — implied by True (42,000 MWh = THB 197M, 2023)")
-    print(f"            grid intensity    {GRID_TCO2E_PER_MWH:4.2f} tCO2e/MWh — implied by True (64,000 MWh -> 28,800 tCO2e)")
-    print(f"            national sites    {NATIONAL_SITES:,}      — True 'One Network' integrated (conservative vs ~30,000)")
+    print(
+        f"  coverage overlap        {COVERAGE_OVERLAP_M:6.0f} m   <-> blockade radius {BLOCKADE_RADIUS_UM} um"
+    )
+    print(f"  scale factor            {SCALE_M_PER_UM:6.1f} m per um")
+    print(
+        f"  min site merge distance {MERGE_THRESHOLD_M:6.0f} m   <-> min atom spacing {MIN_SEPARATION_UM} um"
+    )
+    print(
+        f"  field of view           {FIELD_M / 1000:6.2f} km  <-> {FIELD_UM} um (narrower than a human hair)"
+    )
+    print("  -> 4.5 km of Sukhumvit, rendered in an area narrower than a hair. We did NOT")
+    print("     tune the blockade radius to match; that is where rubidium happens to sit.")
     print("-" * 74)
     print("HONESTY CONSTRAINTS:")
-    print("  • MIS is a CONSERVATIVE relaxation of the true optimum (complement of a minimum")
-    print("    dominating set). It guarantees feasibility but may leave savings unclaimed.")
-    print("  • Coverage is modelled as UNIFORM-RADIUS disks. Real radii vary by band, tilt, class.")
-    print("  • Positions are a REAL OpenCelliD extract (MCC 520, True-group MNCs) — crowdsourced")
-    print("    estimated centroids, NOT surveyed tower locations (data © OpenCelliD, CC-BY-SA 4.0).")
-    print("  • Only LTE/UMTS cells are sleep candidates; GSM stays awake as the always-on 2G")
-    print("    coverage floor, so sleeping broadband never drops a user to 2G speeds.")
-    print("  • NO quantum advantage is claimed anywhere. On these sizes, classical wins.")
-    print("=" * 74)
-
-
-def print_merge_counts(sites: "Sites", atoms: "Sites", df=None) -> None:
-    """The explicit site-merge counts: cells -> sites -> atoms, with the min spacing."""
-    from scipy.spatial.distance import pdist
-    print("SITE-MERGE COUNTS (printed explicitly):")
-    print(f"  {sites.n_cells:>4} cells  ->  {sites.n:>4} sites  ->  {atoms.n:>4} atoms")
-    if df is not None:
-        radio_mix = {k: int(v) for k, v in df["radio"].value_counts().items()}
-        print(f"  radio mix : {radio_mix}")
-        print(f"  True MNCs : {sorted(int(x) for x in df['net'].unique())}   (MCC {THAILAND_MCC})")
-    print(f"  after merge, closest two atoms are {pdist(atoms.xy_m).min():.0f} m apart "
-          f"(floor {MERGE_THRESHOLD_M:.0f} m)")
-
-
-def print_result_summary(best, n_atoms, G, exact_size, retained, total, defect) -> bool:
-    """Headline read-out for a decoded result: |S|, coverage certificate, ratio.
-
-    Returns whether the coverage certificate passed.
-    """
-    ok = verify_independent_set(G, best)
-    print(f"Atom loading is probabilistic: post-selected {retained}/{total} fully-loaded shots "
-          f"(defect rate {defect:.1%}).")
-    print(f"Best sleep set over retained shots : |S| = {len(best)} of {n_atoms} "
-          f"({len(best)/n_atoms:.0%} of the district asleep)")
-    print(f"COVERAGE CERTIFICATE               : "
-          f"{'COVERAGE VERIFIED — no two sleeping cells are neighbours' if ok else 'FAILED'}")
-    print(f"Approximation ratio (best / exact {exact_size}) : {len(best)/exact_size:.2f}")
-    return ok
-
-
-def print_standin_banner(results: dict) -> None:
-    """Loud banner making the results' provenance unmistakable (sim vs real QPU)."""
-    if is_simulated(results):
-        print("!" * 74)
-        print(f"!!  RESULTS SOURCE: {results['source']}  —  simulator stand-in, NOT a QPU measurement")
-        print("!" * 74)
-    else:
-        print(f"RESULTS SOURCE: {results['source']}  (Aquila QPU measurement)")
-
-
-def print_money(best_size: int, n_sites_district: int) -> None:
-    """The money model: per-site energy, this district, and the national sensitivity table."""
-    m = money_model(best_size, n_sites_district)
-    print("MONEY MODEL")
-    print(f"  energy saved per sleeping site per night : "
-          f"{SITE_POWER_KW}kW × {RADIO_SHARE:.0%} radio × {DEEP_SLEEP_SAVING:.0%} deep-sleep × "
-          f"{LOW_TRAFFIC_HOURS:.0f}h = {m['kwh_per_site_night']:.1f} kWh")
-    print(f"  this district ({best_size} asleep)     : "
-          f"{m['district_kwh_year']/1000:,.0f} MWh/yr · ฿{m['district_thb_year']/1e6:,.2f}M/yr · "
-          f"{m['district_tco2e_year']:,.0f} tCO2e/yr")
-    print("\nNATIONAL SENSITIVITY — extra cells slept vs per-cell rules (extrapolation printed):")
-    print(f"  (district {n_sites_district} sites -> national {NATIONAL_SITES:,} sites, factor "
-          f"×{NATIONAL_SITES/n_sites_district:.0f})")
-    for _, r in sensitivity_table(n_sites_district).iterrows():
-        print(f"    {r['incremental_sleep_points']:>8s} :  ฿{r['national_THB_per_year']/1e6:>5.0f} M/yr   "
-              f"{r['national_MWh_per_year']:>7,.0f} MWh/yr   {r['national_tCO2e_per_year']:>6,.0f} tCO2e/yr")
-    print("\n" + "=" * 74)
-    print("Every baht of this is reachable TODAY with a classical solver. Quantum's")
-    print("contribution to this number in 2026 is ZERO. The reason to run it on quantum")
-    print("hardware is to measure the gap — see the next section.")
+    print("  * Protocol (unit-disk) model, not physical: conflicts are binary and pairwise,")
+    print("    while real interference aggregates and fails on a threshold (SINR) ratio.")
+    print("  * Coverage is modelled as UNIFORM-RADIUS disks. Real radii vary by band and tilt.")
+    print("  * Positions are a REAL OpenCelliD extract (MCC 520, True-group MNCs): crowdsourced")
+    print("    estimated centroids, NOT surveyed towers (data (c) OpenCelliD, CC-BY-SA 4.0).")
+    print("  * Only LTE/UMTS cells are used; colocated sectors collapse to one mast per site.")
+    print("  * Repeated-MIS colouring is GREEDY and can overspend; an exact chromatic-number")
+    print("    baseline runs alongside to quantify the gap.")
+    print("  * NO quantum advantage is claimed anywhere. On these sizes, classical wins.")
     print("=" * 74)

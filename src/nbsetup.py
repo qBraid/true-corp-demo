@@ -2,7 +2,7 @@
 nbsetup.py — environment bootstrap for the notebook.
 
 Pure standard library (no third-party imports) so it can run on a fresh kernel and
-install whatever is missing before the notebook imports numpy / braket / sleepcells.
+install whatever is missing before the notebook imports numpy / braket / towers.
 """
 
 from __future__ import annotations

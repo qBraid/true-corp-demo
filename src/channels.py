@@ -27,19 +27,20 @@ from __future__ import annotations
 
 import networkx as nx
 
-import sleepcells as sc
+import towers as tw
 
 
 def _round_mis(H: nx.Graph, solver: str, exact_timeout: float) -> list:
     """One channel's independent set on the residual graph H."""
     if solver == "greedy":
-        return list(sc.greedy_mis(H))
-    S, _wall, _done = sc.exact_mis(H, timeout_s=exact_timeout)
-    return list(S) if S else list(sc.greedy_mis(H))   # greedy fallback if exact stalls
+        return list(tw.greedy_mis(H))
+    S, _wall, _done = tw.exact_mis(H, timeout_s=exact_timeout)
+    return list(S) if S else list(tw.greedy_mis(H))  # greedy fallback if exact stalls
 
 
-def iterated_mis_coloring(G: nx.Graph, first_set=None, solver: str = "exact",
-                          exact_timeout: float = 10.0):
+def iterated_mis_coloring(
+    G: nx.Graph, first_set=None, solver: str = "exact", exact_timeout: float = 10.0
+):
     """Assign every node a channel by repeated MIS.
 
     Args:
@@ -61,7 +62,7 @@ def iterated_mis_coloring(G: nx.Graph, first_set=None, solver: str = "exact",
     while H.number_of_nodes() > 0:
         if not channels and first_set is not None:
             S = [v for v in first_set if v in H]
-            if not sc.verify_independent_set(H, S):
+            if not tw.verify_independent_set(H, S):
                 raise ValueError("first_set is not an independent set of G")
             source = "QPU (Aquila, measured)"
         else:
@@ -70,14 +71,19 @@ def iterated_mis_coloring(G: nx.Graph, first_set=None, solver: str = "exact",
 
         S = sorted(set(int(v) for v in S))
         c = len(channels)
-        provenance.append({
-            "channel": c, "size": len(S), "source": source,
-            "residual_nodes": H.number_of_nodes(), "residual_edges": H.number_of_edges(),
-        })
+        provenance.append(
+            {
+                "channel": c,
+                "size": len(S),
+                "source": source,
+                "residual_nodes": H.number_of_nodes(),
+                "residual_edges": H.number_of_edges(),
+            }
+        )
         channels.append(S)
         for v in S:
             channel_of[v] = c
-        H.remove_nodes_from(S)                 # nodes AND their edges leave together
+        H.remove_nodes_from(S)  # nodes AND their edges leave together
 
     return channels, channel_of, provenance
 
@@ -90,7 +96,8 @@ def verify_coloring(G: nx.Graph, channel_of: dict):
     uncoloured = [v for v in G.nodes() if v not in channel_of]
     monochromatic = [(u, v) for u, v in G.edges() if channel_of.get(u) == channel_of.get(v)]
     return (not uncoloured and not monochromatic), {
-        "uncoloured": uncoloured, "monochromatic_edges": monochromatic,
+        "uncoloured": uncoloured,
+        "monochromatic_edges": monochromatic,
     }
 
 
@@ -132,7 +139,7 @@ def chromatic_number(G: nx.Graph) -> int:
 
         return bt(0)
 
-    k = clique_lower_bound(G)              # chi >= omega — start there
+    k = clique_lower_bound(G)  # chi >= omega — start there
     while not colourable(k):
         k += 1
     return k

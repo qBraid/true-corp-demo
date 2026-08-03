@@ -11,8 +11,8 @@ Watthana / Sukhumvit bounding box (lat 13.710–13.752, lon 100.550–100.600).
 
 - These are **crowdsourced estimated positions**, NOT surveyed tower locations — exactly as the
   deck states.
-- Only **LTE/UMTS** are treated as sleep candidates; **GSM is excluded** — it stays awake as the
-  2G coverage floor, so sleeping broadband never drops a user to 2G speeds. (No NR — OpenCelliD's
+- Only **LTE/UMTS** are used in the reuse plan; **GSM is excluded** — it is the always-on
+  2G coverage floor, not part of the broadband channel plan. (No NR — OpenCelliD's
   crowdsourced 5G coverage of this area is sparse.)
 - ~3,401 True-group LTE/UMTS cells → ~851 sites → **116 atoms** after merging within the 238 m
   (= 4 µm) Aquila floor. The headline sub-district is the densest ~90 that fit the 75 µm field.

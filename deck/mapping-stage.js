@@ -54,8 +54,7 @@ const MIS = new Set();
   for (const n of ADJ[i]) if (MIS.has(n)) return;
   MIS.add(i);
 });
-const AWAKE = MIS;                                                   // channel 1
-const SLEEP = new Set([...pos.keys()].filter(i => !MIS.has(i)));     // not selected
+const UNSEL = new Set([...pos.keys()].filter(i => !MIS.has(i)));     // not selected (later rounds)
 
 // ---- scene
 const wrap = root.querySelector('.ms-wrap');
@@ -77,7 +76,7 @@ const MAT = {
            emissive: 0x000000 }),
   atom:  new THREE.MeshStandardMaterial({ name: 'atom', color: 0xb389ff, roughness: 0.25, metalness: 0.0,
            emissive: 0x6d28d9, emissiveIntensity: 0.9 }),
-  asleep:new THREE.MeshStandardMaterial({ name: 'asleep', color: 0x575450, roughness: 0.7, metalness: 0.0 }),
+  unsel:new THREE.MeshStandardMaterial({ name: 'unsel', color: 0x575450, roughness: 0.7, metalness: 0.0 }),
   disc:  new THREE.MeshBasicMaterial({ name: 'coverage', color: 0x9f6cff, transparent: true, opacity: 0,
            side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
   edge:  new THREE.LineBasicMaterial({ name: 'edge', color: 0x9f6cff, transparent: true, opacity: 0 }),
@@ -228,13 +227,13 @@ function frame(now) {
   const lens   = seg(t, 11.4, 13.2);  // shared ground lights up
   const wire   = seg(t, 13.6, 15.6);  // each overlap becomes an edge
   const reg    = seg(t, 18.0, 21.5);  // register forms
-  const sleep  = seg(t, 23.0, 25.0);  // the sleep set resolves
+  const reveal = seg(t, 23.0, 25.0);  // channel 1 resolves
 
   ACTS[0].classList.toggle('ms-on', t >= 0.4 && t < 9);
   ACTS[1].classList.toggle('ms-on', t >= 9 && t < 18);
   ACTS[2].classList.toggle('ms-on', t >= 18);
 
-  legendEl.style.opacity = String(sleep);
+  legendEl.style.opacity = String(reveal);
 
   towers.forEach((g, i) => {
     const local = clamp01(rise * 1.6 - i * 0.02);
@@ -244,25 +243,25 @@ function frame(now) {
 
   const LIT = new THREE.Color(0xece9e0), ON = new THREE.Color(0xb389ff), OFF = new THREE.Color(0x3a3742);
   nodes.forEach((n, i) => {
-    const asleep = SLEEP.has(i);
+    const unsel = UNSEL.has(i);
     const base = 0.001 + graph * 1 + reg * 0.5;
-    n.scale.setScalar(Math.max(0.001, base * (1 - 0.25 * reg) * (1 - (asleep ? 0.95 : -0.15) * sleep)));
+    n.scale.setScalar(Math.max(0.001, base * (1 - 0.25 * reg) * (1 - (unsel ? 0.95 : -0.15) * reveal)));
     n.position.y = 0.80 - reg * 0.78;
     const m = n.material;
-    m.color.lerpColors(LIT, asleep ? OFF : ON, sleep);
-    m.emissive.setHex(asleep ? 0x000000 : 0x6d28d9);
-    m.emissiveIntensity = asleep ? 0 : 1.1 * sleep;
+    m.color.lerpColors(LIT, unsel ? OFF : ON, reveal);
+    m.emissive.setHex(unsel ? 0x000000 : 0x6d28d9);
+    m.emissiveIntensity = unsel ? 0 : 1.1 * reveal;
     m.transparent = true;
-    m.opacity = 1 - sleep * (asleep ? 1 : 0);
+    m.opacity = 1 - reveal * (unsel ? 1 : 0);
   });
 
   discs.forEach((d, i) => {
     // all radii visible through the node view; in the resolve only channel-1 radii stay
-    const held = SLEEP.has(i) ? 0 : 0.22 * sleep;
-    d.material.opacity = 0.16 * graph * (1 - 0.30 * wire) * (1 - reg) * (1 - (SLEEP.has(i) ? sleep : 0)) + held;
+    const held = UNSEL.has(i) ? 0 : 0.22 * reveal;
+    d.material.opacity = 0.16 * graph * (1 - 0.30 * wire) * (1 - reg) * (1 - (UNSEL.has(i) ? reveal : 0)) + held;
     d.position.y = 0.012;
     const rr = rims[i];
-    rr.material.opacity = 0.5 * graph * (1 - reg) * (SLEEP.has(i) ? (1 - sleep) : 1);
+    rr.material.opacity = 0.5 * graph * (1 - reg) * (UNSEL.has(i) ? (1 - reveal) : 1);
   });
   pulses.forEach((m, i) => {
     m.material.opacity = 0; return;
@@ -272,7 +271,7 @@ function frame(now) {
     m.position.y = nodes[i].position.y + 0.004;
   });
   lensMat.opacity = 0.42 * lens * (1 - 0.55 * wire) * (1 - reg);
-  edgeMat.opacity = 0.55 * wire * (1 + 0.3 * reg) * (1 - sleep);
+  edgeMat.opacity = 0.55 * wire * (1 + 0.3 * reg) * (1 - reveal);
   edgeLines.position.y = -reg * 0.78;
   ringMat.opacity = 0;
   grid.material.opacity = 0.9 * (1 - 0.75 * reg);
